@@ -116,18 +116,28 @@ public class Sistema {
 		}
 
 		private boolean testInvalidAddress(int e) {                 // toda operacao de acesso a memoria deve avaliar se endereco eh valido
-			if (e > reg.length || e < reg.length) { 
-				irpt = Interrupts.intEnderecoInvalido; 
+			if(e > mem.tamMem){
+				irpt = Interrupts.intEnderecoInvalido;
 				return false;
-			};
+			}
 			return true;
 		}
-
+		
 		private boolean testInvalidInstruction(Word w) {            // toda instrucao deve ser verificada
-			if (w.opc == Opcode.___) { 
-				irpt = Interrupts.intInstrucaoInvalida; 
+			if ((w.r1 > reg.length || w.r1 < reg.length) || (w.r2 > reg.length || w.r2 < reg.length)) { 
+				irpt = Interrupts.intEnderecoInvalido; 
 				return false;
-			};
+			} else {
+				Opcode[] op = Opcode.values();
+				for (Opcode operation : op) {
+					if (w.opc == Opcode.___) { 
+						break;
+					} else if(w.opc == operation) {
+						return true;
+					}
+				}
+				irpt = Interrupts.intInstrucaoInvalida;
+			}
 			return true;
 		}
 
@@ -161,19 +171,29 @@ public class Sistema {
 
 					// Instrucoes de Busca e Armazenamento em Memoria
 					    case LDI: // Rd ← k
+							testInvalidAddress(ir.p);
+							testInvalidAddress(ir.r1);
+							testInvalidInstruction(m[ir.r1]);
 							reg[ir.r1] = ir.p;
 							pc++;
 							break;
 
 						case LDD: // Rd <- [A]
 						    if (legal(ir.p)) {
-							   reg[ir.r1] = m[ir.p].p;
-							   pc++;
+								testInvalidAddress(ir.p);
+								testInvalidAddress(ir.r1);
+								testInvalidInstruction(m[ir.r1]);
+								reg[ir.r1] = m[ir.p].p;
+								pc++;
 						    }
 						    break;
 
 						case LDX: // RD <- [RS] // NOVA
 							if (legal(reg[ir.r2])) {
+								testInvalidAddress(ir.r1);
+								testInvalidAddress(ir.r2);
+								testInvalidInstruction(m[ir.r1]);
+								testInvalidInstruction(m[ir.r2]);
 								reg[ir.r1] = m[reg[ir.r2]].p;
 								pc++;
 							}
@@ -181,6 +201,9 @@ public class Sistema {
 
 						case STD: // [A] ← Rs
 						    if (legal(ir.p)) {
+								testInvalidAddress(ir.p);
+								testInvalidAddress(ir.r1);
+								testInvalidInstruction(m[ir.r1]);
 							    m[ir.p].opc = Opcode.DATA;
 							    m[ir.p].p = reg[ir.r1];
 							    pc++;
@@ -189,13 +212,21 @@ public class Sistema {
 
 						case STX: // [Rd] ←Rs
 						    if (legal(reg[ir.r1])) {
-							    m[reg[ir.r1]].opc = Opcode.DATA;      
+								testInvalidAddress(ir.r1);
+								testInvalidAddress(ir.r2);
+								testInvalidInstruction(m[ir.r1]);
+								testInvalidInstruction(m[ir.r2]);
+							    m[reg[ir.r1]].opc = Opcode.DATA;     
 							    m[reg[ir.r1]].p = reg[ir.r2];          
 								pc++;
 							};
 							break;
 						
 						case MOVE: // RD <- RS
+							testInvalidAddress(ir.r1);
+							testInvalidAddress(ir.r2);
+							testInvalidInstruction(m[ir.r1]);
+							testInvalidInstruction(m[ir.r2]);
 							reg[ir.r1] = reg[ir.r2];
 							pc++;
 							break;	
@@ -233,10 +264,12 @@ public class Sistema {
 
 					// Instrucoes JUMP
 						case JMP: // PC <- k
+							testInvalidAddress(ir.p);
 							pc = ir.p;
 							break;
 						
 						case JMPIG: // If Rc > 0 Then PC ← Rs Else PC ← PC +1
+							testInvalidAddress(reg[ir.r1]);
 							if (reg[ir.r2] > 0) {
 								pc = reg[ir.r1];
 							} else {
@@ -245,6 +278,7 @@ public class Sistema {
 							break;
 
 						case JMPIGK: // If RC > 0 then PC <- k else PC++
+							testInvalidAddress(reg[ir.r2]);
 							if (reg[ir.r2] > 0) {
 								pc = ir.p;
 							} else {
@@ -253,6 +287,7 @@ public class Sistema {
 							break;
 	
 						case JMPILK: // If RC < 0 then PC <- k else PC++
+							testInvalidAddress(ir.p);
 							 if (reg[ir.r2] < 0) {
 								pc = ir.p;
 							} else {
@@ -261,6 +296,7 @@ public class Sistema {
 							break;
 	
 						case JMPIEK: // If RC = 0 then PC <- k else PC++
+								testInvalidAddress(ir.p);
 								if (reg[ir.r2] == 0) {
 									pc = ir.p;
 								} else {
@@ -270,6 +306,7 @@ public class Sistema {
 	
 	
 						case JMPIL: // if Rc < 0 then PC <- Rs Else PC <- PC +1
+								testInvalidAddress(reg[ir.r1]);
 								 if (reg[ir.r2] < 0) {
 									pc = reg[ir.r1];
 								} else {
@@ -278,6 +315,7 @@ public class Sistema {
 							break;
 		
 						case JMPIE: // If Rc = 0 Then PC <- Rs Else PC <- PC +1
+								 testInvalidAddress(reg[ir.r1]);
 								 if (reg[ir.r2] == 0) {
 									pc = reg[ir.r1];
 								} else {
@@ -286,10 +324,12 @@ public class Sistema {
 							break; 
 	
 						case JMPIM: // PC <- [A]
+								testInvalidAddress(m[ir.p].p);
 								 pc = m[ir.p].p;
 							 break; 
 	
 						case JMPIGM: // If RC > 0 then PC <- [A] else PC++
+								
 								 if (reg[ir.r2] > 0) {
 									pc = m[ir.p].p;
 								} else {
@@ -338,6 +378,7 @@ public class Sistema {
 
 					// Inexistente
 						default:
+							testInvalidInstruction(m[ir.p]);
 							irpt = Interrupts.intInstrucaoInvalida;
 							break;
 					}
