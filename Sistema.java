@@ -197,7 +197,6 @@ public class Sistema {
 
 						// Instrucoes de Busca e Armazenamento em Memoria
 						case LDI: // Rd ← k
-							testInvalidAddress(ir.p);
 							testInvalidAddress(ir.r1);
 							testInvalidInstruction(m[ir.r1]);
 							reg[ir.r1] = ir.p;
@@ -573,6 +572,8 @@ public class Sistema {
 		// s.loadAndExec(progs.fibonacci10);
 		// s.loadAndExec(progs.progMinimo);
 		s.loadAndExec(progs.fatorial);
+		// s.loadAndExec(progs.entrada);
+		// s.loadAndExec(progs.saida);
 		// s.loadAndExec(progs.fatorialTRAP); // saida
 		// s.loadAndExec(progs.fibonacciTRAP); // entrada
 		// s.loadAndExec(progs.PC); // bubble sort
@@ -587,6 +588,25 @@ public class Sistema {
 	// que podem ser carregados para a memória (load faz isto)
 
 	public class Programas {
+
+		public Word[] entrada = new Word[]{
+			new Word(Opcode.LDI, 8, -1, 1),
+			new Word(Opcode.LDI, 9, -1, 4),
+			new Word(Opcode.TRAP, -1, -1, -1),
+			new Word(Opcode.STOP, -1, -1, -1), 
+			new Word(Opcode.DATA, -1, -1, -1) 
+		}; 
+		
+		
+		public Word[] saida = new Word[] {
+			new Word(Opcode.LDI, 8, -1, 2),
+			new Word(Opcode.LDI, 9, -1, 10),
+			new Word(Opcode.TRAP, -1, -1, -1),
+			new Word(Opcode.STOP, -1, -1, -1), 
+			new Word(Opcode.DATA, -1, -1, -1) 
+		}; 
+		
+
 		public Word[] fatorial = new Word[] {
 				// este fatorial so aceita valores positivos. nao pode ser zero
 				// linha coment
@@ -662,7 +682,8 @@ public class Sistema {
 				new Word(Opcode.LDI, 9, -1, 18), // endereco com valor a escrever
 				new Word(Opcode.TRAP, -1, -1, -1),
 				new Word(Opcode.STOP, -1, -1, -1), // POS 17
-				new Word(Opcode.DATA, -1, -1, -1) };// POS 18
+				new Word(Opcode.DATA, -1, -1, -1) // POS 18
+		};
 
 		public Word[] fibonacciTRAP = new Word[] { // mesmo que prog exemplo, so que usa r0 no lugar de r8
 				new Word(Opcode.LDI, 8, -1, 1), // leitura
@@ -806,5 +827,8 @@ public class Sistema {
 				new Word(Opcode.DATA, -1, -1, -1),
 				new Word(Opcode.DATA, -1, -1, -1),
 				new Word(Opcode.DATA, -1, -1, -1) };
-	}
+
+		};
 }
+
+
