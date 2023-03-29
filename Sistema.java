@@ -318,7 +318,8 @@ public class Sistema {
 							break;
 
 						case JMPIG: // If Rc > 0 Then PC ← Rs Else PC ← PC +1
-							testInvalidAddress(reg[ir.r1]);
+							testInvalidAddress(ir.r1);
+							testInvalidAddress(ir.r2);
 							if (reg[ir.r2] > 0) {
 								pc = reg[ir.r1];
 							} else {
@@ -327,7 +328,7 @@ public class Sistema {
 							break;
 
 						case JMPIGK: // If RC > 0 then PC <- k else PC++
-							testInvalidAddress(reg[ir.r2]);
+							testInvalidAddress(ir.r2);
 							if (reg[ir.r2] > 0) {
 								pc = ir.p;
 							} else {
@@ -336,7 +337,7 @@ public class Sistema {
 							break;
 
 						case JMPILK: // If RC < 0 then PC <- k else PC++
-							testInvalidAddress(ir.p);
+							testInvalidAddress(ir.r2);
 							if (reg[ir.r2] < 0) {
 								pc = ir.p;
 							} else {
@@ -345,7 +346,7 @@ public class Sistema {
 							break;
 
 						case JMPIEK: // If RC = 0 then PC <- k else PC++
-							testInvalidAddress(ir.p);
+							testInvalidAddress(ir.r2);
 							if (reg[ir.r2] == 0) {
 								pc = ir.p;
 							} else {
@@ -354,7 +355,8 @@ public class Sistema {
 							break;
 
 						case JMPIL: // if Rc < 0 then PC <- Rs Else PC <- PC +1
-							testInvalidAddress(reg[ir.r1]);
+							testInvalidAddress(ir.r1);
+							testInvalidAddress(ir.r2);
 							if (reg[ir.r2] < 0) {
 								pc = reg[ir.r1];
 							} else {
@@ -363,7 +365,8 @@ public class Sistema {
 							break;
 
 						case JMPIE: // If Rc = 0 Then PC <- Rs Else PC <- PC +1
-							testInvalidAddress(reg[ir.r1]);
+							testInvalidAddress(ir.r1);
+							testInvalidAddress(ir.r2);
 							if (reg[ir.r2] == 0) {
 								pc = reg[ir.r1];
 							} else {
@@ -372,12 +375,13 @@ public class Sistema {
 							break;
 
 						case JMPIM: // PC <- [A]
-							testInvalidAddress(m[ir.p].p);
+							testInvalidAddress(ir.p);
 							pc = m[ir.p].p;
 							break;
 
 						case JMPIGM: // If RC > 0 then PC <- [A] else PC++
-
+							testInvalidAddress(ir.r2);
+							testInvalidAddress(ir.p);
 							if (reg[ir.r2] > 0) {
 								pc = m[ir.p].p;
 							} else {
@@ -386,6 +390,8 @@ public class Sistema {
 							break;
 
 						case JMPILM: // If RC < 0 then PC <- k else PC++
+							testInvalidAddress(ir.r2);
+							testInvalidAddress(ir.p);
 							if (reg[ir.r2] < 0) {
 								pc = m[ir.p].p;
 							} else {
@@ -394,6 +400,8 @@ public class Sistema {
 							break;
 
 						case JMPIEM: // If RC = 0 then PC <- k else PC++
+							testInvalidAddress(ir.r2);
+							testInvalidAddress(ir.p);
 							if (reg[ir.r2] == 0) {
 								pc = m[ir.p].p;
 							} else {
@@ -402,6 +410,8 @@ public class Sistema {
 							break;
 
 						case JMPIGT: // If RS>RC then PC <- k else PC++
+							testInvalidAddress(ir.r1);
+							testInvalidAddress(ir.r2);
 							if (reg[ir.r1] > reg[ir.r2]) {
 								pc = ir.p;
 							} else {
@@ -411,6 +421,7 @@ public class Sistema {
 
 						// outras
 						case STOP: // por enquanto, para execucao
+							testStop();
 							irpt = Interrupts.intSTOP;
 							break;
 
