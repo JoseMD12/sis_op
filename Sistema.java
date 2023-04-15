@@ -147,10 +147,14 @@ public class Sistema {
 		}
 
 		private boolean testInvalidInstruction(Word w) { // toda instrucao deve ser verificada
-			if ((w.r1 > reg.length || w.r1 < reg.length) || (w.r2 > reg.length || w.r2 < reg.length)) {
+			if ((w.r1 > reg.length || w.r1 < -1) || (w.r2 > reg.length || w.r2 < -1)) {
+
 				irpt = Interrupts.intEnderecoInvalido;
 				return false;
 			} else {
+
+				System.out.println("Opcode: " + w.opc);
+
 				Opcode[] op = Opcode.values();
 				for (Opcode operation : op) {
 					if (w.opc == Opcode.___) {
@@ -198,7 +202,10 @@ public class Sistema {
 						// Instrucoes de Busca e Armazenamento em Memoria
 						case LDI: // Rd ← k
 							testInvalidAddress(ir.r1);
-							testInvalidInstruction(m[ir.r1]);
+							System.out.println("R1: " + ir.r1);
+							System.out.println("P: " + ir.p);
+							System.out.println("MP: " + m[ir.p].opc);
+							testInvalidInstruction(m[ir.p]);
 							reg[ir.r1] = ir.p;
 							pc++;
 							break;
@@ -207,7 +214,7 @@ public class Sistema {
 							if (legal(ir.p)) {
 								testInvalidAddress(ir.p);
 								testInvalidAddress(ir.r1);
-								testInvalidInstruction(m[ir.r1]);
+								testInvalidInstruction(m[ir.p]);
 								reg[ir.r1] = m[ir.p].p;
 								pc++;
 							}
@@ -217,7 +224,6 @@ public class Sistema {
 							if (legal(reg[ir.r2])) {
 								testInvalidAddress(ir.r1);
 								testInvalidAddress(ir.r2);
-								testInvalidInstruction(m[ir.r1]);
 								testInvalidInstruction(m[ir.r2]);
 								reg[ir.r1] = m[reg[ir.r2]].p;
 								pc++;
@@ -229,6 +235,7 @@ public class Sistema {
 								testInvalidAddress(ir.p);
 								testInvalidAddress(ir.r1);
 								testInvalidInstruction(m[ir.r1]);
+								testInvalidInstruction(m[ir.p]);
 								m[ir.p].opc = Opcode.DATA;
 								m[ir.p].p = reg[ir.r1];
 								pc++;
@@ -300,11 +307,8 @@ public class Sistema {
 							break;
 
 						case MULT: // Rd <- Rd * Rs
-
 							testInvalidAddress(ir.r1);
-							testInvalidAddress(ir.p);
 							testInvalidInstruction(m[ir.r1]);
-							testInvalidInstruction(m[ir.p]);
 							reg[ir.r1] = reg[ir.r1] * reg[ir.r2];
 							testOverflow(reg[ir.r1]);
 							pc++;
@@ -425,13 +429,31 @@ public class Sistema {
 							break;
 
 						case DATA:
+							
 							irpt = Interrupts.intInstrucaoInvalida;
 							break;
 
 						// Chamada de sistema
 						case TRAP:
 							sysCall.handle(); // <<<<< aqui desvia para rotina de chamada de sistema, no momento so
-												// temos IO
+							if(reg[8] == 1) {
+								Scanner in = new Scanner(System.in)	;				// temos IO
+								int c = in.nextInt();
+								
+								int posicao = reg[9];
+	
+								m[posicao].opc = Opcode.DATA;
+								m[posicao].p = c;
+
+								in.close();
+							} else if(reg[8] == 2){
+								int valor = reg[9];
+								m[valor].opc = Opcode.DATA;
+								m[valor].p = reg[9];
+								
+								System.out.println(valor);
+							}
+
 							pc++;
 							break;
 
@@ -571,9 +593,9 @@ public class Sistema {
 		Sistema s = new Sistema();
 		// s.loadAndExec(progs.fibonacci10);
 		// s.loadAndExec(progs.progMinimo);
-		s.loadAndExec(progs.fatorial);
+		// s.loadAndExec(progs.fatorial);
 		// s.loadAndExec(progs.entrada);
-		// s.loadAndExec(progs.saida);
+		s.loadAndExec(progs.saida);
 		// s.loadAndExec(progs.fatorialTRAP); // saida
 		// s.loadAndExec(progs.fibonacciTRAP); // entrada
 		// s.loadAndExec(progs.PC); // bubble sort
@@ -610,7 +632,7 @@ public class Sistema {
 		public Word[] fatorial = new Word[] {
 				// este fatorial so aceita valores positivos. nao pode ser zero
 				// linha coment
-				new Word(Opcode.LDI, 0, -1, 4), // 0 r0 é valor a calcular fatorial
+				new Word(Opcode.LDI, 0, -1, 5), // 0 r0 é valor a calcular fatorial
 				new Word(Opcode.LDI, 1, -1, 1), // 1 r1 é 1 para multiplicar (por r0)
 				new Word(Opcode.LDI, 6, -1, 1), // 2 r6 é 1 para ser o decremento
 				new Word(Opcode.LDI, 7, -1, 8), // 3 r7 tem posicao de stop do programa = 8
