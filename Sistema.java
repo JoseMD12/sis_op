@@ -152,9 +152,6 @@ public class Sistema {
 				irpt = Interrupts.intEnderecoInvalido;
 				return false;
 			} else {
-
-				System.out.println("Opcode: " + w.opc);
-
 				Opcode[] op = Opcode.values();
 				for (Opcode operation : op) {
 					if (w.opc == Opcode.___) {
@@ -202,9 +199,6 @@ public class Sistema {
 						// Instrucoes de Busca e Armazenamento em Memoria
 						case LDI: // Rd ← k
 							testInvalidAddress(ir.r1);
-							System.out.println("R1: " + ir.r1);
-							System.out.println("P: " + ir.p);
-							System.out.println("MP: " + m[ir.p].opc);
 							testInvalidInstruction(m[ir.p]);
 							reg[ir.r1] = ir.p;
 							pc++;
@@ -447,11 +441,8 @@ public class Sistema {
 
 								in.close();
 							} else if(reg[8] == 2){
-								int valor = reg[9];
-								m[valor].opc = Opcode.DATA;
-								m[valor].p = reg[9];
-								
-								System.out.println(valor);
+								int posicao = reg[9];
+								System.out.println("OUTPUT DATA [posicao = " + posicao + "]: " + m[posicao].p);
 							}
 
 							pc++;
@@ -483,6 +474,7 @@ public class Sistema {
 	// -----------------------------------------------
 	public class VM {
 		public int tamMem;
+		public int tamPag;
 		public Word[] m;
 		public Memory mem;
 		public CPU cpu;
@@ -595,7 +587,8 @@ public class Sistema {
 		// s.loadAndExec(progs.progMinimo);
 		// s.loadAndExec(progs.fatorial);
 		// s.loadAndExec(progs.entrada);
-		s.loadAndExec(progs.saida);
+		// s.loadAndExec(progs.saida);
+		s.loadAndExec(progs.io);
 		// s.loadAndExec(progs.fatorialTRAP); // saida
 		// s.loadAndExec(progs.fibonacciTRAP); // entrada
 		// s.loadAndExec(progs.PC); // bubble sort
@@ -613,10 +606,18 @@ public class Sistema {
 
 		public Word[] entrada = new Word[]{
 			new Word(Opcode.LDI, 8, -1, 1),
-			new Word(Opcode.LDI, 9, -1, 4),
+			new Word(Opcode.LDI, 9, -1, 10),
 			new Word(Opcode.TRAP, -1, -1, -1),
 			new Word(Opcode.STOP, -1, -1, -1), 
-			new Word(Opcode.DATA, -1, -1, -1) 
+			new Word(Opcode.DATA, -1, -1, -1), 
+			new Word(Opcode.DATA, -1, -1, -1), 
+			new Word(Opcode.DATA, -1, -1, -1), 
+			new Word(Opcode.DATA, -1, -1, -1), 
+			new Word(Opcode.DATA, -1, -1, -1), 
+			new Word(Opcode.DATA, -1, -1, -1), 
+			new Word(Opcode.DATA, -1, -1, -1), 
+			new Word(Opcode.DATA, -1, -1, -1), 
+			new Word(Opcode.DATA, -1, -1, -1), 
 		}; 
 		
 		
@@ -625,8 +626,31 @@ public class Sistema {
 			new Word(Opcode.LDI, 9, -1, 10),
 			new Word(Opcode.TRAP, -1, -1, -1),
 			new Word(Opcode.STOP, -1, -1, -1), 
-			new Word(Opcode.DATA, -1, -1, -1) 
+			new Word(Opcode.DATA, -1, -1, -1),
+			new Word(Opcode.DATA, -1, -1, -1), 
+			new Word(Opcode.DATA, -1, -1, -1), 
+			new Word(Opcode.DATA, -1, -1, -1), 
+			new Word(Opcode.DATA, -1, -1, -1), 
+			new Word(Opcode.DATA, -1, -1, -1), 
+			new Word(Opcode.DATA, -1, -1, -1), 
+			new Word(Opcode.DATA, -1, -1, -1), 
+			new Word(Opcode.DATA, -1, -1, -1), 
+			new Word(Opcode.DATA, -1, -1, -1),  
 		}; 
+
+		public Word[] io = new Word[] {
+			new Word(Opcode.LDI, 8, -1, 1),
+			new Word(Opcode.LDI, 9, -1, 10),
+			new Word(Opcode.TRAP, -1, -1, -1),
+			new Word(Opcode.LDI, 8, -1, 2),
+			new Word(Opcode.LDI, 9, -1, 10),
+			new Word(Opcode.TRAP, -1, -1, -1),
+			new Word(Opcode.STOP, -1, -1, -1), 
+			new Word(Opcode.DATA, -1, -1, -1), 
+			new Word(Opcode.DATA, -1, -1, -1), 
+			new Word(Opcode.DATA, -1, -1, -1), 
+			new Word(Opcode.DATA, -1, -1, -1), 
+		};
 		
 
 		public Word[] fatorial = new Word[] {
