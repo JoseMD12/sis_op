@@ -23,9 +23,9 @@ public class Sistema {
 		public int tamMem;
 		public Word[] m; // m representa a memória fisica: um array de posicoes de memoria (word)
 
-		public Memory(int size) {
-			tamMem = size;
-			m = new Word[tamMem];
+		public Memory(int tamMem) {
+			this.tamMem = tamMem;
+			this.m = new Word[tamMem];
 			for (int i = 0; i < tamMem; i++) {
 				m[i] = new Word(Opcode.___, -1, -1, -1);
 			}
@@ -474,26 +474,74 @@ public class Sistema {
 	// -----------------------------------------------
 	public class VM {
 		public int tamMem;
-		public int tamPag;
 		public Word[] m;
 		public Memory mem;
 		public CPU cpu;
+		public GM gm;
 
 		public VM(InterruptHandling ih, SysCallHandling sysCall) {
 			// vm deve ser configurada com endereço de tratamento de interrupcoes e de
 			// chamadas de sistema
 			// cria memória
 			tamMem = 1024;
+			int tamPag = 8;
 			mem = new Memory(tamMem);
 			m = mem.m;
+			gm = new GM(tamMem, tamPag);
 			// cria cpu
 			cpu = new CPU(mem, ih, sysCall, true); // true liga debug
 		}
+
+		
 	}
 	// ------------------- V M - fim
 	// ------------------------------------------------------------------------
 	// -------------------------------------------------------------------------------------------------------
 
+	public class GM {
+		private int[][] frames;
+		private int nFramesAlocados;
+		
+		public GM(int tamMem, int tamPag) {
+			this.frames = new int[tamMem / tamPag][];
+			for(int i = 0; i < frames.length; i++) {
+				this.frames[i] = null;
+			}
+			this.nFramesAlocados = 0;
+		}
+
+		public int[] aloca(Word[] process, Word[] memory){
+			int nroPaginas = (process.length % 8 == 0) ? (process.length / 8) : ((process.length / 8) + 1);
+			int framesRestantes = frames.length - nFramesAlocados;
+			
+			if(framesRestantes < nroPaginas) {
+				return null;
+			}
+ 
+			int[] tabelaPaginas = new int[nroPaginas];
+			// for(int frameAtual[] : frames) {
+			// 	if(frameAtual == null) {
+			// 		frameAtual = new int[8];
+			// 		for(int i = 0; i < 8; i++) {
+			// 			frameAtual[i] = process
+			// 		}
+			// 		break;
+			// 	}
+			// }
+
+			// for (int i = 0; i < p.length; i++) {
+			// 	m[i].opc = p[i].opc;
+			// 	m[i].r1 = p[i].r1;
+			// 	m[i].r2 = p[i].r2;
+			// 	m[i].p = p[i].p;
+			// }
+			return tabelaPaginas;
+		}
+
+		public void desaloca(int[] tabelaPaginas){
+			return;
+		}
+	}
 	// --------------------H A R D W A R E - fim
 	// -------------------------------------------------------------
 	// -------------------------------------------------------------------------------------------------------
@@ -534,17 +582,8 @@ public class Sistema {
 	// -----------------------------------------
 	// ------------------ load é invocado a partir de requisição do usuário
 
-	private void loadProgram(Word[] p, Word[] m) {
-		for (int i = 0; i < p.length; i++) {
-			m[i].opc = p[i].opc;
-			m[i].r1 = p[i].r1;
-			m[i].r2 = p[i].r2;
-			m[i].p = p[i].p;
-		}
-	}
-
 	private void loadProgram(Word[] p) {
-		loadProgram(p, vm.m);
+		vm.gm.aloca(p, vm.m);
 	}
 
 	private void loadAndExec(Word[] p) {
