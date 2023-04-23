@@ -499,42 +499,60 @@ public class Sistema {
 	// -------------------------------------------------------------------------------------------------------
 
 	public class GM {
-		private int[][] frames;
-		private int nFramesAlocados;
+		private Memory memory;
+		private int tamPag;
+
+		private static Word[] frames;
+		private int ultimoAlocado;
 		
-		public GM(int tamMem, int tamPag) {
-			this.frames = new int[tamMem / tamPag][];
+		public GM(int tamPag) {
+			this.tamPag = tamPag;
+			this.memory = vm.mem;
+			this.ultimoAlocado = 0;
+			frames = new Word[this.memory.m.length / tamPag];
+
 			for(int i = 0; i < frames.length; i++) {
-				this.frames[i] = null;
+				frames[i] = null;
 			}
-			this.nFramesAlocados = 0;
 		}
 
 		public int[] aloca(Word[] process, Word[] memory){
-			int nroPaginas = (process.length % 8 == 0) ? (process.length / 8) : ((process.length / 8) + 1);
-			int framesRestantes = frames.length - nFramesAlocados;
-			
-			if(framesRestantes < nroPaginas) {
-				return null;
-			}
- 
-			int[] tabelaPaginas = new int[nroPaginas];
-			// for(int frameAtual[] : frames) {
-			// 	if(frameAtual == null) {
-			// 		frameAtual = new int[8];
-			// 		for(int i = 0; i < 8; i++) {
-			// 			frameAtual[i] = process
-			// 		}
-			// 		break;
-			// 	}
-			// }
+			int nroPaginas = (process.length % tamPag == 0) ? (process.length / tamPag) : ((process.length / tamPag) + 1);
 
-			// for (int i = 0; i < p.length; i++) {
-			// 	m[i].opc = p[i].opc;
-			// 	m[i].r1 = p[i].r1;
-			// 	m[i].r2 = p[i].r2;
-			// 	m[i].p = p[i].p;
-			// }
+			int[] tabelaPaginas = new int[nroPaginas];
+			int pagAlocadas = 0;
+			do {
+
+				//Se o ultimo frame alocado for o ultimo do vetor, volta para o primeiro 
+				if(ultimoAlocado == frames.length) {
+					ultimoAlocado = 0;
+				}
+
+				//Se o frame atual estiver ocupado, pula para o proximo
+				if(frames[ultimoAlocado] != null) {
+					if(ultimoAlocado == 0){
+						ultimoAlocado += 7;
+					}
+					ultimoAlocado += 8;
+
+				//Se o frame atual estiver livre, aloca o processo
+				} else if(frames[ultimoAlocado] == null){
+					//Aloca 8 paginas do processo por vez (1 frame)
+					for(int i = pagAlocadas; i < pagAlocadas + 8; i++) {
+						int posicaoFrame = ultimoAlocado + (i % 8);
+						memory[posicaoFrame].opc = process[i].opc; //A memoria recebe o processo
+						memory[posicaoFrame].r1 = process[i].r1;
+						memory[posicaoFrame].r2 = process[i].r2;
+						memory[posicaoFrame].p = process[i].p;
+
+						frames[posicaoFrame] = process[i]; //A tabela de frames recebe o endereco da memoria
+
+						tabelaPaginas[i] = posicaoFrame; //A tabela de paginas recebe o endereco do frame alocado
+					}
+					pagAlocadas += 8;
+				}
+			} while ( pagAlocadas < nroPaginas);
+
 			return tabelaPaginas;
 		}
 
