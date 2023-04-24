@@ -478,11 +478,13 @@ public class Sistema {
 		public Memory mem;
 		public CPU cpu;
 		public GM gm;
+		public GP gp;
 
 		public VM(InterruptHandling ih, SysCallHandling sysCall) {
 			// vm deve ser configurada com endereço de tratamento de interrupcoes e de
 			// chamadas de sistema
 			// cria memória
+			gp = new GP();
 			tamMem = 1024;
 			int tamPag = 8;
 			mem = new Memory(tamMem);
@@ -497,6 +499,25 @@ public class Sistema {
 	// ------------------- V M - fim
 	// ------------------------------------------------------------------------
 	// -------------------------------------------------------------------------------------------------------
+
+
+		// --------------------H A R D W A R E - fim
+	// -------------------------------------------------------------
+	// -------------------------------------------------------------------------------------------------------
+
+	// -------------------------------------------------------------------------------------------------------
+
+	// -------------------------------------------------------------------------------------------------------
+	// -------------------------------------------------------------------------------------------------------
+	// -------------------------------------------------------------------------------------------------------
+	// ------------------- S O F T W A R E - inicio
+	// ----------------------------------------------------------
+
+
+	// ------------------- G M - Gerente de Memória
+	// -----------------------------------------------
+	// -------------------------- frames da memória
+	// -----------------------------------------------
 
 	public class GM {
 		private int tamMem;
@@ -589,17 +610,107 @@ public class Sistema {
 
 		}
 	}
-		// --------------------H A R D W A R E - fim
-	// -------------------------------------------------------------
+
+	// ------------------- G M - fim
+	// ------------------------------------------------------------------------
 	// -------------------------------------------------------------------------------------------------------
 
+
+	// ------------------- G P - Gerente de Processos
+	// -----------------------------------------------
+	// --------------------------
+	// -----------------------------------------------
+
+	public class GP {
+		private static PCB[] listaRunning;
+		private static PCB[] listaReady;
+		private static PCB[] listaBlocked;
+
+		public Map<Integer, Integer> criaProcesso(Word[] programa) {
+
+			Map<Integer, Integer> tabelaPaginasPrograma = loadProgram(programa); // carga do programa na memoria
+
+			if(tabelaPaginasPrograma == null) {
+				//sem espaço
+				return null;
+			}
+
+			// System.out.println("---------------------------------- tabela de paginas do programa");
+			// System.out.println(tabelaPaginasPrograma);
+
+			// System.out.println("---------------------------------- programa carregado na memoria");
+			vm.mem.dump(0, programa.length); // dump da memoria nestas posicoes
+			vm.cpu.setContext(0, vm.tamMem - 1, 0); // seta estado da cpu ]
+
+			PCB pcb = new PCB(0, "running", new int[16], 0, new int[16]); // cria PCB do processo
+			pcb.set
+
+			// System.out.println("---------------------------------- inicia execucao ");
+			vm.cpu.run(); // cpu roda programa ate parar
+
+			// System.out.println("---------------------------------- memoria após execucao ");
+			vm.mem.dump(0, programa.length); // dump da memoria com resultado
+
+			
+			return tabelaPaginasPrograma;
+		}
+	}
+
+	public class PCB {
+		private int processId; // identificação do processo
+		private String processState; // estado do processo
+		private int[] reg; // registradores do processador
+		private int pc; // contador do programa
+		private int[] memory; // informações de gerenciamento de memória
+
+		public PCB(int processId, String processState, int[] reg, int pc, int[] memory) {
+			this.processId = processId;
+			this.processState = processState;
+			this.reg = reg;
+			this.pc = pc;
+			this.memory = memory;
+		}
+
+        public int getProcessId() {
+            return processId;
+        }
+
+        public void setProcessId(int processId) {
+            this.processId = processId;
+        }
+
+        public String getProcessState() {
+            return processState;
+        }
+
+        public void setProcessState(String processState) {
+            this.processState = processState;
+        }
+
+        public int[] getReg() {
+            return reg;
+        }
+
+        public int getPc() {
+            return pc;
+        }
+
+        public void setPc(int pc) {
+            this.pc = pc;
+        }
+
+        public int[] getMemory() {
+            return memory;
+        }
+
+	}
+
+
+	// ------------------- G P - fim
+	// ------------------------------------------------------------------------
 	// -------------------------------------------------------------------------------------------------------
 
-	// -------------------------------------------------------------------------------------------------------
-	// -------------------------------------------------------------------------------------------------------
-	// -------------------------------------------------------------------------------------------------------
-	// ------------------- S O F T W A R E - inicio
-	// ----------------------------------------------------------
+
 
 	// ------------------- I N T E R R U P C O E S - rotinas de tratamento
 	// ----------------------------------
@@ -638,18 +749,8 @@ public class Sistema {
 	}
 
 	private void loadAndExec(Word[] p) {
-		Map<Integer, Integer> tabelaPaginasPrograma = loadProgram(p); // carga do programa na memoria
-		System.out.println("---------------------------------- tabela de paginas do programa");
-		System.out.println(tabelaPaginasPrograma);
-
-
-		System.out.println("---------------------------------- programa carregado na memoria");
-		vm.mem.dump(0, p.length); // dump da memoria nestas posicoes
-		vm.cpu.setContext(0, vm.tamMem - 1, 0); // seta estado da cpu ]
-		System.out.println("---------------------------------- inicia execucao ");
-		vm.cpu.run(); // cpu roda programa ate parar
-		System.out.println("---------------------------------- memoria após execucao ");
-		vm.mem.dump(0, p.length); // dump da memoria com resultado
+		Map<Integer, Integer> tabelaPaginasPrograma = vm.gp.criaProcesso(p);
+		
 		unloadProgram(tabelaPaginasPrograma);
 	}
 

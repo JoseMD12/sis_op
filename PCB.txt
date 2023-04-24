@@ -1,0 +1,25 @@
+Os componentes típicos de um PCB incluem:
+
+Identificação do processo: um identificador único para o processo.
+Estado do processo: informações sobre o estado atual do processo, como "executando", "esperando", "suspenso" etc.
+Contador do programa: o valor do contador do programa que indica o endereço da próxima instrução a ser executada pelo processo.
+Registradores do processador: os valores dos registradores do processador que foram salvos pelo sistema operacional quando o processo foi suspenso.
+Informações de gerenciamento de memória: informações sobre a memória que está sendo usada pelo processo, incluindo a localização da pilha e do heap.
+Informações de gerenciamento de recursos: informações sobre quais recursos o processo está usando, como arquivos abertos, dispositivos de E/S, semáforos, mutexes, etc.
+
+- aloca memória
+– cria PCB
+– carrega código do processo ou copia o código do pai para o filho (modelo fork)
+– encadeia PCB nas estruturas do sistema
+– declara processo como pronto para executar
+
+
+
+
+
+
+
+
+Prioridade do processo: a prioridade do processo em relação a outros processos em execução no sistema.
+Informações de propriedade do processo: informações sobre o usuário ou grupo que é proprietário do processo, bem como as permissões de acesso do processo.
+Informações de escalonamento: informações sobre como o processo deve ser escalonado pelo sistema operacional, incluindo sua prioridade, tempo de execução, etc.
