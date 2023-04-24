@@ -88,6 +88,7 @@ public class Sistema {
 	}
 
 	public class CPU {
+		private boolean traceOn = true; // se true, mostra cada instrucao em execucao
 		private int maxInt; // valores maximo e minimo para inteiros nesta cpu
 		private int minInt;
 		// característica do processador: contexto da CPU ...
@@ -169,8 +170,7 @@ public class Sistema {
 			if (ir.opc == Opcode.STOP) {
 				irpt = Interrupts.intSTOP;
 				return true;
-			}
-			;
+			};
 			return false;
 		}
 
@@ -188,7 +188,7 @@ public class Sistema {
 				// FETCH
 				if (legal(pc)) { // pc valido
 					ir = m[pc]; // <<<<<<<<<<<< busca posicao da memoria apontada por pc, guarda em ir
-					if (debug) {
+					if (debug && vm.cpu.traceOn) {
 						System.out.print("                               pc: " + pc + "       exec: ");
 						mem.dump(ir);
 					}
@@ -432,6 +432,7 @@ public class Sistema {
 							sysCall.handle(); // <<<<< aqui desvia para rotina de chamada de sistema, no momento so
 							if (reg[8] == 1) {
 								Scanner in = new Scanner(System.in); // temos IO
+								System.out.println("INPUT DATA: ");
 								int c = in.nextInt();
 
 								int posicao = reg[9];
@@ -568,21 +569,13 @@ public class Sistema {
 
 					instrucoesAlocadas += 8;
 					instrucoes = null;
-
-					System.out.println(tabelaPagina);
 				}
 			} while (instrucoesAlocadas < process.length);
 
 			return tabelaPagina;
 		}
 
-		// TODO testar o desaloca
-		public void desaloca(Map<Integer, Integer> tabelaPagina) {
-			for (Integer frame : tabelaPagina.values()) {
-				listaFrames.remove(frame);
-			}
-		}
-
+		
 		// Após o GM alocar os frames, devolvendo a tabelaPaginas, deve-se proceder a
 		// carga
 		// cada pagina i do programa deve ser copiada (exatamente como tal) para o frame
@@ -591,7 +584,7 @@ public class Sistema {
 				Word[] instrucoes, Map<Integer, Integer> tabelaPagina) {
 
 			for (int i = instrucoesAlocadas; i < instrucoesAlocadas + tamFrame; i++) {
-
+				
 				int posicaoDoFrameNaMemoria = ultimoFrameAlocado * 8 + (i % tamFrame);
 
 				if (i < process.length) {
@@ -601,13 +594,19 @@ public class Sistema {
 					memory[posicaoDoFrameNaMemoria].p = process[i].p;
 
 					listaFrames.put(ultimoFrameAlocado, instrucoes); // A tabela de frame recebe o endereco da memoria
-
+					
 					tabelaPagina.put(i, ultimoFrameAlocado);
 				}
 			}
-
+			
 			return tabelaPagina;
+			
+		}
 
+		public void desaloca(Map<Integer, Integer> tabelaPagina) {
+			for (Integer frame : tabelaPagina.values()) {
+				listaFrames.remove(frame);
+			}
 		}
 	}
 
@@ -643,15 +642,14 @@ public class Sistema {
 				// sem espaço
 				return null;
 			}
+			if(vm.cpu.traceOn){
+				System.out.println("---------------------------------- tabela de paginas do programa");
+				System.out.println(tabelaPaginasPrograma);
+				System.out.println("\n---------------------------------- programa carregado na memoria");
+			}
 
-			// System.out.println("---------------------------------- tabela de paginas do
-			// programa");
-			// System.out.println(tabelaPaginasPrograma);
-
-			System.out.println("---------------------------------- programa carregado na memoria");
 
 			int primeiroFramePrograma = tabelaPaginasPrograma.get(0); // pega o primeiro frame do programa
-			System.out.println("primeiro frame do programa: " + primeiroFramePrograma);
 			int endereçoNaMemoria = (primeiroFramePrograma * vm.gm.tamFrame); // calcula o endereço na memoria
 
 			Opcode op = vm.m[endereçoNaMemoria].opc; // pega opcode da primeira instrucao
@@ -661,47 +659,63 @@ public class Sistema {
 
 			int[] reg = { r1, r2, p };
 
-			vm.mem.dump(0, programa.length); // dump da memoria nestas posicoes
-			vm.cpu.setContext(0, vm.tamMem - 1, 0); // seta estado da cpu ]
-
 			PCB pcb = new PCB(id, "ready", reg, 0, tabelaPaginasPrograma); // cria PCB do processo
+
+			Set<Integer> frames = new HashSet<Integer>();
+			for(int i = 0; i < pcb.getTabelaPaginas().values().size(); i++) {
+				frames.add((Integer) pcb.getTabelaPaginas().values().toArray()[i]);
+			}
+			
+			if(vm.cpu.traceOn){
+				dump(frames);
+			}
+			vm.cpu.setContext(0, vm.tamMem - 1, 0); // seta estado da cpu
+
 			id++; // incrementa id
 			listaProcess.add(pcb); // adiciona PCB na lista de processos
 			listaReady.add(pcb); // adiciona PCB na lista de prontos
 
-			/**
-			 * Cria PCB
-			 * Seta partição usada no pcb
-			 * Carrega o programa
-			 * Seta demais parâmetros do PCB (id, pc=0, etc)
-			 * Coloca PCB na fila de prontos
-			 */
-
-			// pcb.set
-
-			System.out.println("---------------------------------- inicia execucao ");
-
-			int index = listaReady.indexOf(pcb);
-			listaReady.get(index).setProcessState("running"); // seta estado do processo para running
-			listaReady.remove(index); // remove processo da lista de processos prontos
-			listaRunning.add(pcb); // adiciona processo a lista de processos em execucao
-
-			vm.cpu.run(); // cpu roda programa ate parar
-
 			return pcb;
 		}
 
-		public Map<Integer, Integer> desalocaProcesso(int id) {
-			System.out.println("desaloca processo: " + id);
+		
+		//executa <id> - executa o processo com id fornecido. se não houver processo, retorna erro.
+		public void executa(int id){
+			int[] index = new int[1];
+			listaProcess.forEach(p -> {
+				if (p.getProcessId() == id) {
+					index[0] = listaReady.indexOf(p);
+				}
+			});
+			
+			PCB pcb = listaProcess.get(index[0]);
+			
+			if (pcb == null) {
+				return;
+			}
+			
+			
+			if(vm.cpu.traceOn){
+				System.out.println("---------------------------------- inicia execucao ");
+			}
+			
+			listaReady.get(index[0]).setProcessState("running"); // seta estado do processo para running
+			listaReady.remove(index[0]); // remove processo da lista de processos prontos
+			listaRunning.add(pcb); // adiciona processo a lista de processos em execucao
+			
+			vm.cpu.run(); // cpu roda programa ate parar
+		}
+
+		public Map<Integer, Integer> desaloca(int id) {
 			int[] index = new int[1];
 			listaProcess.forEach(p -> {
 				if (p.getProcessId() == id) {
 					index[0] = listaProcess.indexOf(p);
 				}
 			});
-
+	
 			PCB pcb = listaProcess.get(index[0]);
-
+	
 			if (pcb == null) {
 				return null;
 			}
@@ -710,62 +724,23 @@ public class Sistema {
 			for(int i = 0; i < pcb.getTabelaPaginas().values().size(); i++) {
 				frames.add((Integer) pcb.getTabelaPaginas().values().toArray()[i]);
 			}
-
-			for(Integer frame : frames) {
-				System.out.println("frame: " + frame);
-			}
+	
 			
-			dump(frames);
+			if(vm.cpu.traceOn){
+				for(Integer frame : frames) {
+					System.out.println("frame: " + frame);
+				}
 
-
+				System.out.println("---------------------------------- memoria do processo após execucao");
+				dump(frames);
+			}
+	
 			vm.gm.desaloca(pcb.getTabelaPaginas());
 			listaRunning.get(index[0]).setProcessState("finished"); // seta estado do processo para finished
 			listaRunning.remove(index[0]); // remove processo da lista de processos em execucao
 			listaProcess.remove(index[0]); // remove processo da lista de processos
-
+	
 			return pcb.getTabelaPaginas();
-		}
-
-		// dump <id> - lista o conteúdo do PCB e o conteúdo da partição de memória do processo com id
-		public void dump(Collection<Integer> frames) {
-			System.out.println("---------------------------------- memoria após execucao");
-			
-			for (Integer frame : frames) {
-				System.out.println("frame: " + frame);
-				System.out.println("inicio: " + (frame * vm.gm.tamFrame));
-				System.out.println("fim: " + ((frame + 1) * vm.gm.tamFrame - 1));
-				vm.mem.dump((frame * vm.gm.tamFrame), ((frame + 1) * vm.gm.tamFrame));// dump da memoria com
-																							// resultado
-			}
-		}
-
-		// dumpM <inicio, fim> - lista a memória entre posições início e fim, independente do processo
-		public void dumpM(int inicio, int fim){
-			vm.mem.dump(inicio, fim);
-		}
-
-		//executa <id> - executa o processo com id fornecido. se não houver processo, retorna erro.
-		public void executa(int id){
-			int[] index = new int[1];
-			listaProcess.forEach(p -> {
-				if (p.getProcessId() == id) {
-					index[0] = listaProcess.indexOf(p);
-				}
-			});
-
-			PCB pcb = listaProcess.get(index[0]);
-
-			if (pcb == null) {
-				return;
-			}
-
-			System.out.println("---------------------------------- inicia execucao ");
-
-			listaReady.get(index[0]).setProcessState("running"); // seta estado do processo para running
-			listaReady.remove(index[0]); // remove processo da lista de processos prontos
-			listaRunning.add(pcb); // adiciona processo a lista de processos em execucao
-
-			vm.cpu.run(); // cpu roda programa ate parar
 		}
 	}
 
@@ -831,8 +806,10 @@ public class Sistema {
 	public class InterruptHandling {
 		public void handle(Interrupts irpt, int pc) { // apenas avisa - todas interrupcoes neste momento finalizam o
 														// programa
-			System.out
-					.println("                                               Interrupcao " + irpt + "   pc: " + pc);
+			if(vm.cpu.traceOn){
+				System.out
+						.println("                                               Interrupcao " + irpt + "   pc: " + pc);
+			}
 		}
 	}
 
@@ -846,8 +823,10 @@ public class Sistema {
 		}
 
 		public void handle() { // apenas avisa - todas interrupcoes neste momento finalizam o programa
-			System.out.println("                                               Chamada de Sistema com op  /  par:  "
-					+ vm.cpu.reg[8] + " / " + vm.cpu.reg[9]);
+			if(vm.cpu.traceOn){
+				System.out.println("                                               Chamada de Sistema com op  /  par:  "
+						+ vm.cpu.reg[8] + " / " + vm.cpu.reg[9]);
+			}
 		}
 	}
 
@@ -855,14 +834,47 @@ public class Sistema {
 	// -----------------------------------------
 	// ------------------ load é invocado a partir de requisição do usuário
 
-	private void loadAndExec(Word[] p) {
+	private int load(Word[] p) {
 		PCB pcbProcesso = vm.gp.criaProcesso(p);
-		vm.gp.desalocaProcesso(pcbProcesso.getProcessId());
+		return pcbProcesso.getProcessId();
+	}
+
+	private void executa(int id){
+		vm.gp.executa(id);
+	}
+
+	private void desaloca(int id){
+		vm.gp.desaloca(id);
 	}
 
 	//exit - sai do sistema
 	private void exit(){
 		System.exit(0);
+	}
+
+	// dump <id> - lista o conteúdo do PCB e o conteúdo da partição de memória do processo com id
+	public void dump(Collection<Integer> frames) {
+		
+			for (Integer frame : frames) {
+				System.out.println("frame: " + frame);
+				System.out.println("inicio: " + (frame * vm.gm.tamFrame));
+				System.out.println("fim: " + ((frame + 1) * vm.gm.tamFrame - 1));
+				vm.mem.dump((frame * vm.gm.tamFrame), ((frame + 1) * vm.gm.tamFrame));// dump da memoria com resultado
+			}
+		
+	}
+
+	// dumpM <inicio, fim> - lista a memória entre posições início e fim, independente do processo
+	public void dumpM(int inicio, int fim){
+		vm.mem.dump(inicio, fim);
+	}
+
+	public void traceOn() {
+		vm.cpu.traceOn = true;
+	}
+
+	public void traceOff() {
+		vm.cpu.traceOn = false;
 	}
 
 	// -------------------------------------------------------------------------------------------------------
@@ -890,15 +902,21 @@ public class Sistema {
 	// ------------------- instancia e testa sistema
 	public static void main(String args[]) {
 		Sistema s = new Sistema();
+		s.traceOn();
 		// s.loadAndExec(progs.fibonacci10);
 		// s.loadAndExec(progs.progMinimo);
-		// s.loadAndExec(progs.fatorial);
 		// s.loadAndExec(progs.entrada);
 		// s.loadAndExec(progs.saida);
-		s.loadAndExec(progs.io);
+		int id = s.load(progs.io);
+		s.executa(id);
+		s.desaloca(id);
+		// int id2= s.load(progs.fatorial);
+		// s.executa(id2);
+		// s.desaloca(id2);
 		// s.loadAndExec(progs.fatorialTRAP); // saida
 		// s.loadAndExec(progs.fibonacciTRAP); // entrada
 		// s.loadAndExec(progs.PC); // bubble sort
+		s.exit();
 
 	}
 
