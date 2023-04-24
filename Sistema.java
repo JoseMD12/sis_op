@@ -643,7 +643,7 @@ public class Sistema {
 			vm.cpu.setContext(0, vm.tamMem - 1, 0); // seta estado da cpu ]
 
 			PCB pcb = new PCB(0, "running", new int[16], 0, new int[16]); // cria PCB do processo
-			pcb.set
+			// pcb.set
 
 			// System.out.println("---------------------------------- inicia execucao ");
 			vm.cpu.run(); // cpu roda programa ate parar
