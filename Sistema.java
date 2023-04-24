@@ -499,68 +499,97 @@ public class Sistema {
 	// -------------------------------------------------------------------------------------------------------
 
 	public class GM {
-		private Memory memory;
-		private int tamPag;
-
-		private static Word[] frames;
-		private int ultimoAlocado;
+		private int tamMem;
+		private int tamFrame;
+		private static Map<Integer, Word[]> listaFrames;
+		private static int ultimoFrameAlocado;
 		
-		public GM(int tamPag) {
-			this.tamPag = tamPag;
-			this.memory = vm.mem;
-			this.ultimoAlocado = 0;
-			frames = new Word[this.memory.m.length / tamPag];
-
-			for(int i = 0; i < frames.length; i++) {
-				frames[i] = null;
-			}
+		public GM(int tamMem, int tamPag) {
+			this.tamMem = tamMem;
+			this.tamFrame = tamPag;
+			ultimoFrameAlocado = 0;
+			listaFrames = new HashMap<Integer, Word[]>(tamMem / tamPag);
 		}
 
-		public int[] aloca(Word[] process, Word[] memory){
-			int nroPaginas = (process.length % tamPag == 0) ? (process.length / tamPag) : ((process.length / tamPag) + 1);
-
-			int[] tabelaPaginas = new int[nroPaginas];
-			int pagAlocadas = 0;
+		public Map<Integer, Integer> aloca(Word[] process, Word[] memory){
+			
+			int nroPaginas = (process.length % tamFrame == 0) ? (process.length / tamFrame) : ((process.length / tamFrame) + 1);
+			int framesAlocados = listaFrames.size();
+			if(framesAlocados + nroPaginas > tamMem / tamFrame) {
+				System.out.println("Memoria insuficiente");
+				return null;
+			}
+			
+			Map<Integer, Integer> tabelaPagina = new HashMap<Integer, Integer>(nroPaginas);
+			
+			int instrucoesAlocadas = 0;
 			do {
-
 				//Se o ultimo frame alocado for o ultimo do vetor, volta para o primeiro 
-				if(ultimoAlocado == frames.length) {
-					ultimoAlocado = 0;
+				if(ultimoFrameAlocado == listaFrames.size()) {
+					ultimoFrameAlocado = 0;
 				}
 
 				//Se o frame atual estiver ocupado, pula para o proximo
-				if(frames[ultimoAlocado] != null) {
-					if(ultimoAlocado == 0){
-						ultimoAlocado += 7;
-					}
-					ultimoAlocado += 8;
-
+				if(listaFrames.get(ultimoFrameAlocado) != null) {
+					ultimoFrameAlocado++;
+				} 
+				
 				//Se o frame atual estiver livre, aloca o processo
-				} else if(frames[ultimoAlocado] == null){
+				if(listaFrames.get(ultimoFrameAlocado) == null){
+					
 					//Aloca 8 paginas do processo por vez (1 frame)
-					for(int i = pagAlocadas; i < pagAlocadas + 8; i++) {
-						int posicaoFrame = ultimoAlocado + (i % 8);
-						memory[posicaoFrame].opc = process[i].opc; //A memoria recebe o processo
-						memory[posicaoFrame].r1 = process[i].r1;
-						memory[posicaoFrame].r2 = process[i].r2;
-						memory[posicaoFrame].p = process[i].p;
-
-						frames[posicaoFrame] = process[i]; //A tabela de frames recebe o endereco da memoria
-
-						tabelaPaginas[i] = posicaoFrame; //A tabela de paginas recebe o endereco do frame alocado
+					Word[] instrucoes = new Word[tamFrame];
+					for(int i = instrucoesAlocadas; i < instrucoesAlocadas + tamFrame; i++){
+						if(i < process.length){
+							instrucoes[i % tamFrame] = process[i];
+						}
 					}
-					pagAlocadas += 8;
-				}
-			} while ( pagAlocadas < nroPaginas);
+					
+					carga(instrucoesAlocadas, process, memory, nroPaginas, instrucoes, tabelaPagina);
+					
+					instrucoesAlocadas += 8;
+					instrucoes = null;
 
-			return tabelaPaginas;
+					System.out.println(tabelaPagina);
+				}
+			} while (instrucoesAlocadas < process.length);
+
+			return tabelaPagina;
 		}
 
-		public void desaloca(int[] tabelaPaginas){
-			return;
+
+		//TODO testar o desaloca
+		public void desaloca(Map<Integer, Integer> tabelaPagina) {
+			for (Integer frame : tabelaPagina.values()) {
+				listaFrames.remove(frame);
+			}
+		}
+
+		// Após o GM alocar os frames, devolvendo a tabelaPaginas, deve-se proceder a carga
+		// cada pagina i do programa deve ser copiada (exatamente como tal) para o frame informado em tabela páginas
+		public Map<Integer, Integer> carga(int instrucoesAlocadas, Word[] process, Word[] memory, int nroPaginas, Word[] instrucoes, Map<Integer, Integer> tabelaPagina) {
+			
+			for(int i = instrucoesAlocadas; i < instrucoesAlocadas + tamFrame; i++) {
+				
+				int posicaoDoFrameNaMemoria = ultimoFrameAlocado * 8 + (i % tamFrame);
+				
+				if (i < process.length) {
+					memory[posicaoDoFrameNaMemoria].opc = process[i].opc; //A memoria recebe o processo
+					memory[posicaoDoFrameNaMemoria].r1 = process[i].r1;
+					memory[posicaoDoFrameNaMemoria].r2 = process[i].r2;
+					memory[posicaoDoFrameNaMemoria].p = process[i].p;
+					
+					listaFrames.put(ultimoFrameAlocado, instrucoes);  //A tabela de frame recebe o endereco da memoria
+					
+					tabelaPagina.put(i, ultimoFrameAlocado);
+				}
+			}
+
+			return tabelaPagina;
+
 		}
 	}
-	// --------------------H A R D W A R E - fim
+		// --------------------H A R D W A R E - fim
 	// -------------------------------------------------------------
 	// -------------------------------------------------------------------------------------------------------
 
@@ -600,12 +629,20 @@ public class Sistema {
 	// -----------------------------------------
 	// ------------------ load é invocado a partir de requisição do usuário
 
-	private void loadProgram(Word[] p) {
-		vm.gm.aloca(p, vm.m);
+	private Map<Integer, Integer> loadProgram(Word[] p) {
+		return vm.gm.aloca(p, vm.m);
+	}
+
+	private void unloadProgram(Map<Integer, Integer> tabelaPaginasPrograma) {
+		vm.gm.desaloca(tabelaPaginasPrograma);
 	}
 
 	private void loadAndExec(Word[] p) {
-		loadProgram(p); // carga do programa na memoria
+		Map<Integer, Integer> tabelaPaginasPrograma = loadProgram(p); // carga do programa na memoria
+		System.out.println("---------------------------------- tabela de paginas do programa");
+		System.out.println(tabelaPaginasPrograma);
+
+
 		System.out.println("---------------------------------- programa carregado na memoria");
 		vm.mem.dump(0, p.length); // dump da memoria nestas posicoes
 		vm.cpu.setContext(0, vm.tamMem - 1, 0); // seta estado da cpu ]
@@ -613,6 +650,7 @@ public class Sistema {
 		vm.cpu.run(); // cpu roda programa ate parar
 		System.out.println("---------------------------------- memoria após execucao ");
 		vm.mem.dump(0, p.length); // dump da memoria com resultado
+		unloadProgram(tabelaPaginasPrograma);
 	}
 
 	// -------------------------------------------------------------------------------------------------------
