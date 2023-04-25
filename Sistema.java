@@ -181,7 +181,7 @@ public class Sistema {
 			irpt = Interrupts.noInterrupt; // reset da interrupcao registrada
 		}
 
-		public void run() { // execucao da CPU supoe que o contexto da CPU, vide acima, esta devidamente
+		public void run(Word[] memory) { // execucao da CPU supoe que o contexto da CPU, vide acima, esta devidamente
 							// setado
 			while (true) { // ciclo de instrucoes. acaba cfe instrucao, veja cada caso.
 				// --------------------------------------------------------------------------------------------------
@@ -433,7 +433,8 @@ public class Sistema {
 							if (reg[8] == 1) {
 								Scanner in = new Scanner(System.in); // temos IO
 								System.out.println("INPUT DATA: ");
-								int c = in.nextInt();
+								// int c = in.nextInt();
+								int c = 50;
 
 								int posicao = reg[9];
 
@@ -585,7 +586,7 @@ public class Sistema {
 
 			for (int i = instrucoesAlocadas; i < instrucoesAlocadas + tamFrame; i++) {
 				
-				int posicaoDoFrameNaMemoria = ultimoFrameAlocado * 8 + (i % tamFrame);
+				int posicaoDoFrameNaMemoria = ultimoFrameAlocado * tamFrame + (i % tamFrame);
 
 				if (i < process.length) {
 					memory[posicaoDoFrameNaMemoria].opc = process[i].opc; // A memoria recebe o processo
@@ -669,7 +670,14 @@ public class Sistema {
 			if(vm.cpu.traceOn){
 				dump(frames);
 			}
-			vm.cpu.setContext(0, vm.tamMem - 1, 0); // seta estado da cpu
+
+			pcb.setMemory(new Word[frames.size() * vm.gm.tamFrame]); // cria memoria do processo
+
+			Word[] memoriaProcesso = pcb.getMemory(); // pega memoria do processo
+			for(int i = 0; i < tabelaPaginasPrograma.values().size(); i++) {
+				memoriaProcesso[i] = vm.m[tabelaPaginasPrograma.get(i) * vm.gm.tamFrame + i];
+			}
+			
 
 			id++; // incrementa id
 			listaProcess.add(pcb); // adiciona PCB na lista de processos
@@ -698,12 +706,14 @@ public class Sistema {
 			if(vm.cpu.traceOn){
 				System.out.println("---------------------------------- inicia execucao ");
 			}
+
+			vm.cpu.setContext(0, vm.tamMem - 1, pcb.getTabelaPaginas().get(0)); // seta estado da cpu
 			
 			listaReady.get(index[0]).setProcessState("running"); // seta estado do processo para running
 			listaReady.remove(index[0]); // remove processo da lista de processos prontos
 			listaRunning.add(pcb); // adiciona processo a lista de processos em execucao
 			
-			vm.cpu.run(); // cpu roda programa ate parar
+			vm.cpu.run(pcb.getMemory()); // cpu roda programa ate parar
 		}
 
 		public Map<Integer, Integer> desaloca(int id) {
@@ -752,6 +762,7 @@ public class Sistema {
 		private int p;
 		private int pc; // contador do programa
 		private Map<Integer, Integer> tabelaPaginas; // informações de gerenciamento de memória
+		private Word[] memory;
 
 		public PCB(int processId, String processState, int[] reg, int pc, Map<Integer, Integer> tabelaPaginas) {
 			this.processId = processId;
@@ -761,6 +772,14 @@ public class Sistema {
 			this.p = reg[2];
 			this.pc = pc;
 			this.tabelaPaginas = tabelaPaginas;
+		}
+
+		public Word[] getMemory(){
+			return memory;
+		}
+
+		public void setMemory(Word[] memory){
+			this.memory = memory;
 		}
 
 		public int getProcessId() {
@@ -901,21 +920,159 @@ public class Sistema {
 	// -------------------------------------------------------------------------------------------------------
 	// ------------------- instancia e testa sistema
 	public static void main(String args[]) {
+		
 		Sistema s = new Sistema();
 		s.traceOn();
+		int opcao = 42;
+		while(opcao != -1){
+			System.out.println("------------------------------------");
+			System.out.println("       Digite o comando: ");
+			System.out.println("       1 - load");
+			System.out.println("       2 - executa");
+			System.out.println("       3 - desaloca");
+			System.out.println("       4 - exit");
+			System.out.println("       5 - dump");
+			System.out.println("       6 - dumpM");
+			System.out.println("       7 - traceOn");
+			System.out.println("       8 - traceOff");
+			System.out.println("------------------------------------");
+			System.out.println("\n\n");
+
+			Scanner scanner = new Scanner(System.in);
+			opcao = scanner.nextInt();
+
+			switch(opcao) {
+				case 1:
+					System.out.println("------------------------------------");
+					System.out.println("		 Digite o programa: ");
+					System.out.println("       1 - fibonacci10");
+					System.out.println("       2 - progMinimo");
+					System.out.println("       3 - entrada");
+					System.out.println("       4 - saida");
+					System.out.println("       5 - io");
+					System.out.println("       6 - fatorial");
+					System.out.println("       7 - fibonacciTRAP");
+					System.out.println("       8 - fatorialTRAP");
+					System.out.println("------------------------------------");
+					System.out.println("\n\n");
+
+					int programa = scanner.nextInt();
+					switch(programa){
+						case 1:
+							s.load(progs.fibonacci10);
+							break;
+						case 2:
+							s.load(progs.progMinimo);
+							break;
+						case 3:
+							s.load(progs.entrada);
+							break;
+						case 4:
+							s.load(progs.saida);
+							break;
+						case 5:
+							s.load(progs.io);
+							break;
+						case 6:
+							s.load(progs.fatorial);
+							break;
+						case 7:
+							s.load(progs.fibonacciTRAP);
+							break;
+						case 8:
+							s.load(progs.fatorialTRAP);
+							break;
+						default:
+							System.out.println("Programa não encontrado");
+							break;	
+					}
+					System.out.println("------------------------------------");
+					System.out.println("\n\n");
+					break;
+				case 2:
+					System.out.println("Digite o id do programa: ");
+					int id = scanner.nextInt();
+					s.executa(id);
+					System.out.println("------------------------------------");
+					System.out.println("\n\n");
+					break;
+				case 3:
+					System.out.println("Digite o id do programa: ");
+					int id2 = scanner.nextInt();
+					s.desaloca(id2);
+					System.out.println("------------------------------------");
+					System.out.println("\n\n");
+					break;
+				case 4:
+					s.exit();
+					break;
+				case 5:
+					System.out.println("------------------------------------");
+					System.out.println("Digite o id do programa: ");
+					System.out.println("\n\n");
+					int id3 = scanner.nextInt();
+					
+					int[] index = new int[1];
+					s.vm.gp.listaProcess.forEach(p -> {
+						if (p.getProcessId() == id3) {
+							index[0] = s.vm.gp.listaProcess.indexOf(p);
+						}
+					});
+			
+					PCB pcb = s.vm.gp.listaProcess.get(index[0]);
+			
+					if (pcb == null) {
+						System.out.println("Processo não encontrado");
+					}
+					
+					Set<Integer> frames = new HashSet<Integer>();
+					for(int i = 0; i < pcb.getTabelaPaginas().values().size(); i++) {
+						frames.add((Integer) pcb.getTabelaPaginas().values().toArray()[i]);
+					}
+
+					s.dump(frames);
+					System.out.println("------------------------------------");
+					System.out.println("\n\n");
+					break;
+				case 6:
+					System.out.println("------------------------------------");
+					System.out.println("Digite o inicio: ");
+					int inicio = scanner.nextInt();
+					System.out.println("Digite o fim: ");
+					int fim = scanner.nextInt();
+					s.dumpM(inicio, fim);
+					System.out.println("------------------------------------");
+					System.out.println("\n\n");
+					break;
+				case 7:
+					s.traceOn();
+					break;
+				case 8:
+					s.traceOff();
+					break;
+				default:
+					System.out.println("Comando não encontrado");
+					break;
+			}
+		}
+
+
 		// s.loadAndExec(progs.fibonacci10);
 		// s.loadAndExec(progs.progMinimo);
 		// s.loadAndExec(progs.entrada);
 		// s.loadAndExec(progs.saida);
 		int id = s.load(progs.io);
+		int id2= s.load(progs.fatorial);
+		
 		s.executa(id);
+		s.executa(id2);
+
 		s.desaloca(id);
-		// int id2= s.load(progs.fatorial);
-		// s.executa(id2);
-		// s.desaloca(id2);
+		s.desaloca(id2);
 		// s.loadAndExec(progs.fatorialTRAP); // saida
 		// s.loadAndExec(progs.fibonacciTRAP); // entrada
 		// s.loadAndExec(progs.PC); // bubble sort
+		//scanner.close();
 		s.exit();
 
 	}
