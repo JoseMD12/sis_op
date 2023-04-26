@@ -92,7 +92,7 @@ public class Sistema {
 		private int maxInt; // valores maximo e minimo para inteiros nesta cpu
 		private int minInt;
 		// característica do processador: contexto da CPU ...
-		private int pc; // ... composto de program counter,
+		public int pc; // ... composto de program counter,
 		private Word ir; // instruction register,
 		private int[] reg; // registradores da CPU
 		private Interrupts irpt; // durante instrucao, interrupcao pode ser sinalizada
@@ -157,24 +157,21 @@ public class Sistema {
 				System.out.println("Registrador valido");
 				Opcode[] op = Opcode.values();
 				for (Opcode operation : op) {
-					if (w.opc == Opcode.___) {
-						System.out.println("Opcode invalido");
-						break;
-					} else if (w.opc == operation) {
-						System.out.println("Opcode valido");
+					if (w.opc == operation) {
 						return true;
 					}
 				}
 				irpt = Interrupts.intInstrucaoInvalida;
 			}
-			return true;
+			return false;
 		}
 
 		private boolean testStop() { // toda instrucao deve ser verificada
 			if (ir.opc == Opcode.STOP) {
 				irpt = Interrupts.intSTOP;
 				return true;
-			};
+			}
+			;
 			return false;
 		}
 
@@ -185,17 +182,41 @@ public class Sistema {
 			irpt = Interrupts.noInterrupt; // reset da interrupcao registrada
 		}
 
-		public void run(Word[] memory) { // execucao da CPU supoe que o contexto da CPU, vide acima, esta devidamente
-							// setado
+		public void run(PCB pcb) { // execucao da CPU supoe que o contexto da CPU, vide acima, esta devidamente
+			Set<Integer> framesSet = new HashSet<Integer>();
+			for (int i = 0; i < pcb.getTabelaPaginas().values().size(); i++) {
+				framesSet.add((Integer) pcb.getTabelaPaginas().values().toArray()[i]);
+			}
+			int[] frames = new int[framesSet.size()];
+			int j = 0;
+			for (Integer i : framesSet) {
+				frames[j] = i;
+				j++;
+			}
+
+			int rodado = 0;
+			int qnt = 0;
+			pc = pcb.getPc();
+			System.out.println("PC: " + pc);
+
 			while (true) { // ciclo de instrucoes. acaba cfe instrucao, veja cada caso.
 				// --------------------------------------------------------------------------------------------------
 				// FETCH
+				if (rodado == vm.gm.tamFrame - 1) {
+					qnt++;
+					pc = frames[qnt] * vm.gm.tamFrame;
+					System.out.println("PC: " + pc);
+				}
 				if (legal(pc)) { // pc valido
-					ir = memory[pc]; // <<<<<<<<<<<< busca posicao da memoria apontada por pc, guarda em ir
+					ir = m[pc]; // <<<<<<<<<<<< busca posicao da memoria apontada por pc, guarda em ir
 					if (debug && vm.cpu.traceOn) {
 						System.out.print("                               pc: " + pc + "       exec: ");
 						mem.dump(ir);
 					}
+
+					int frameDoProcesso = 0;
+					int instrucaoDoProcesso = 0;
+					int posicaoNaMemoria = pc;
 					// --------------------------------------------------------------------------------------------------
 					// EXECUTA INSTRUCAO NO ir
 					switch (ir.opc) { // conforme o opcode (código de operação) executa
@@ -203,8 +224,10 @@ public class Sistema {
 						// Instrucoes de Busca e Armazenamento em Memoria
 						case LDI: // Rd ← k
 							testInvalidAddress(ir.r1);
-							// testInvalidInstruction(m[ir.p]);
+							testInvalidInstruction(m[ir.p]);
+
 							reg[ir.r1] = ir.p;
+							rodado++;
 							pc++;
 							break;
 
@@ -213,7 +236,8 @@ public class Sistema {
 								testInvalidAddress(ir.p);
 								testInvalidAddress(ir.r1);
 								testInvalidInstruction(m[ir.p]);
-								reg[ir.r1] = memory[ir.p].p;
+								reg[ir.r1] = m[ir.p].p;
+								rodado++;
 								pc++;
 							}
 							break;
@@ -224,6 +248,7 @@ public class Sistema {
 								testInvalidAddress(ir.r2);
 								testInvalidInstruction(m[ir.r2]);
 								reg[ir.r1] = m[reg[ir.r2]].p;
+								rodado++;
 								pc++;
 							}
 							break;
@@ -232,10 +257,15 @@ public class Sistema {
 							if (legal(ir.p)) {
 								testInvalidAddress(ir.p);
 								testInvalidAddress(ir.r1);
-								testInvalidInstruction(memory[ir.r1]);
-								testInvalidInstruction(memory[ir.p]);
-								memory[ir.p].opc = Opcode.DATA;
-								memory[ir.p].p = reg[ir.r1];
+								testInvalidInstruction(m[ir.r1]);
+								testInvalidInstruction(m[ir.p]);
+								frameDoProcesso = ((int) ir.p / vm.gm.tamFrame);
+								instrucaoDoProcesso = (ir.p % vm.gm.tamFrame);
+								posicaoNaMemoria = frames[frameDoProcesso] * vm.gm.tamFrame + instrucaoDoProcesso;
+
+								m[posicaoNaMemoria].opc = Opcode.DATA;
+								m[posicaoNaMemoria].p = reg[ir.r1];
+								rodado++;
 								pc++;
 							}
 							;
@@ -247,8 +277,13 @@ public class Sistema {
 								testInvalidAddress(ir.r2);
 								testInvalidInstruction(m[ir.r1]);
 								testInvalidInstruction(m[ir.r2]);
-								m[reg[ir.r1]].opc = Opcode.DATA;
-								m[reg[ir.r1]].p = reg[ir.r2];
+								frameDoProcesso = ((int) reg[ir.r1] / vm.gm.tamFrame);
+								instrucaoDoProcesso = (reg[ir.r1] % vm.gm.tamFrame);
+								posicaoNaMemoria = frames[frameDoProcesso] * vm.gm.tamFrame + instrucaoDoProcesso;
+
+								m[posicaoNaMemoria].opc = Opcode.DATA;
+								m[posicaoNaMemoria].p = reg[ir.r2];
+								rodado++;
 								pc++;
 							}
 							;
@@ -260,6 +295,7 @@ public class Sistema {
 							testInvalidInstruction(m[ir.r1]);
 							testInvalidInstruction(m[ir.r2]);
 							reg[ir.r1] = reg[ir.r2];
+							rodado++;
 							pc++;
 							break;
 
@@ -271,6 +307,7 @@ public class Sistema {
 							testInvalidInstruction(m[ir.r2]);
 							reg[ir.r1] = reg[ir.r1] + reg[ir.r2];
 							testOverflow(reg[ir.r1]);
+							rodado++;
 							pc++;
 							break;
 
@@ -281,6 +318,7 @@ public class Sistema {
 							testInvalidInstruction(m[ir.p]);
 							reg[ir.r1] = reg[ir.r1] + ir.p;
 							testOverflow(reg[ir.r1]);
+							rodado++;
 							pc++;
 							break;
 
@@ -291,6 +329,7 @@ public class Sistema {
 							testInvalidInstruction(m[ir.r2]);
 							reg[ir.r1] = reg[ir.r1] - reg[ir.r2];
 							testOverflow(reg[ir.r1]);
+							rodado++;
 							pc++;
 							break;
 
@@ -301,6 +340,7 @@ public class Sistema {
 							testInvalidInstruction(m[ir.p]);
 							reg[ir.r1] = reg[ir.r1] - ir.p;
 							testOverflow(reg[ir.r1]);
+							rodado++;
 							pc++;
 							break;
 
@@ -309,21 +349,32 @@ public class Sistema {
 							testInvalidInstruction(m[ir.r1]);
 							reg[ir.r1] = reg[ir.r1] * reg[ir.r2];
 							testOverflow(reg[ir.r1]);
+							rodado++;
 							pc++;
 							break;
 
 						// Instrucoes JUMP
 						case JMP: // PC <- k
 							testInvalidAddress(ir.p);
-							pc = ir.p;
+							frameDoProcesso = ((int) ir.p / vm.gm.tamFrame); // 10 / 8 = 1 * tamFrame
+							instrucaoDoProcesso = (ir.p % vm.gm.tamFrame); // 10 % 8 = 2
+							posicaoNaMemoria = frames[frameDoProcesso] * vm.gm.tamFrame + instrucaoDoProcesso;
+							pc = posicaoNaMemoria;
 							break;
 
 						case JMPIG: // If Rc > 0 Then PC ← Rs Else PC ← PC +1
 							testInvalidAddress(ir.r1);
 							testInvalidAddress(ir.r2);
+
 							if (reg[ir.r2] > 0) {
-								pc = reg[ir.r1];
+								frameDoProcesso = ((int) reg[ir.r1] / vm.gm.tamFrame);
+								instrucaoDoProcesso = (reg[ir.r1] % vm.gm.tamFrame);
+								posicaoNaMemoria = frames[frameDoProcesso] * vm.gm.tamFrame + instrucaoDoProcesso;
+								System.out.println("JMPIG: " + posicaoNaMemoria);
+								pc = posicaoNaMemoria;
+								rodado++;
 							} else {
+								rodado++;
 								pc++;
 							}
 							break;
@@ -331,8 +382,13 @@ public class Sistema {
 						case JMPIGK: // If RC > 0 then PC <- k else PC++
 							testInvalidAddress(ir.r2);
 							if (reg[ir.r2] > 0) {
-								pc = ir.p;
+								frameDoProcesso = ((int) ir.p / vm.gm.tamFrame);
+								instrucaoDoProcesso = (ir.p % vm.gm.tamFrame);
+								posicaoNaMemoria = frames[frameDoProcesso] * vm.gm.tamFrame + instrucaoDoProcesso;
+								pc = posicaoNaMemoria;
+								rodado++;
 							} else {
+								rodado++;
 								pc++;
 							}
 							break;
@@ -340,8 +396,13 @@ public class Sistema {
 						case JMPILK: // If RC < 0 then PC <- k else PC++
 							testInvalidAddress(ir.r2);
 							if (reg[ir.r2] < 0) {
-								pc = ir.p;
+								frameDoProcesso = ((int) ir.p / vm.gm.tamFrame);
+								instrucaoDoProcesso = (ir.p % vm.gm.tamFrame);
+								posicaoNaMemoria = frames[frameDoProcesso] * vm.gm.tamFrame + instrucaoDoProcesso;
+								pc = posicaoNaMemoria;
+								rodado++;
 							} else {
+								rodado++;
 								pc++;
 							}
 							break;
@@ -349,8 +410,13 @@ public class Sistema {
 						case JMPIEK: // If RC = 0 then PC <- k else PC++
 							testInvalidAddress(ir.r2);
 							if (reg[ir.r2] == 0) {
-								pc = ir.p;
+								frameDoProcesso = ((int) ir.p / vm.gm.tamFrame); // 10 / 8 = 1 * tamFrame
+								instrucaoDoProcesso = (ir.p % vm.gm.tamFrame);
+								posicaoNaMemoria = frames[frameDoProcesso] * vm.gm.tamFrame + instrucaoDoProcesso;
+								pc = posicaoNaMemoria;
+								rodado++;
 							} else {
+								rodado++;
 								pc++;
 							}
 							break;
@@ -359,8 +425,14 @@ public class Sistema {
 							testInvalidAddress(ir.r1);
 							testInvalidAddress(ir.r2);
 							if (reg[ir.r2] < 0) {
-								pc = reg[ir.r1];
+								frameDoProcesso = ((int) reg[ir.r1] / vm.gm.tamFrame); // 10 / 8 = 1 * tamFrame
+								instrucaoDoProcesso = (reg[ir.r1] % vm.gm.tamFrame);
+								posicaoNaMemoria = frames[frameDoProcesso] * vm.gm.tamFrame + instrucaoDoProcesso;
+								System.out.println("JMPIL: " + posicaoNaMemoria);
+								pc = posicaoNaMemoria;
+								rodado++;
 							} else {
+								rodado++;
 								pc++;
 							}
 							break;
@@ -369,23 +441,36 @@ public class Sistema {
 							testInvalidAddress(ir.r1);
 							testInvalidAddress(ir.r2);
 							if (reg[ir.r2] == 0) {
-								pc = reg[ir.r1];
+								frameDoProcesso = ((int) reg[ir.r1] / vm.gm.tamFrame); // 10 / 8 = 1 * tamFrame
+								instrucaoDoProcesso = (reg[ir.r1] % vm.gm.tamFrame);
+								posicaoNaMemoria = frames[frameDoProcesso] * vm.gm.tamFrame + instrucaoDoProcesso;
+								pc = posicaoNaMemoria;
+								rodado++;
 							} else {
+								rodado++;
 								pc++;
 							}
 							break;
 
 						case JMPIM: // PC <- [A]
 							testInvalidAddress(ir.p);
-							pc = m[ir.p].p;
+							frameDoProcesso = ((int) ir.p / vm.gm.tamFrame); // 10 / 8 = 1 * tamFrame
+							instrucaoDoProcesso = (ir.p % vm.gm.tamFrame);
+							posicaoNaMemoria = frames[frameDoProcesso] * vm.gm.tamFrame + instrucaoDoProcesso;
+							pc = m[posicaoNaMemoria].p;
 							break;
 
 						case JMPIGM: // If RC > 0 then PC <- [A] else PC++
 							testInvalidAddress(ir.r2);
 							testInvalidAddress(ir.p);
 							if (reg[ir.r2] > 0) {
-								pc = m[ir.p].p;
+								frameDoProcesso = ((int) ir.p / vm.gm.tamFrame); // 10 / 8 = 1 * tamFrame
+								instrucaoDoProcesso = (ir.p % vm.gm.tamFrame);
+								posicaoNaMemoria = frames[frameDoProcesso] * vm.gm.tamFrame + instrucaoDoProcesso;
+								pc = m[posicaoNaMemoria].p;
+								rodado++;
 							} else {
+								rodado++;
 								pc++;
 							}
 							break;
@@ -394,8 +479,13 @@ public class Sistema {
 							testInvalidAddress(ir.r2);
 							testInvalidAddress(ir.p);
 							if (reg[ir.r2] < 0) {
-								pc = m[ir.p].p;
+								frameDoProcesso = ((int) m[ir.p].p / vm.gm.tamFrame); // 10 / 8 = 1 * tamFrame
+								instrucaoDoProcesso = (m[ir.p].p % vm.gm.tamFrame);
+								posicaoNaMemoria = frames[frameDoProcesso] * vm.gm.tamFrame + instrucaoDoProcesso;
+								pc = posicaoNaMemoria;
+								rodado++;
 							} else {
+								rodado++;
 								pc++;
 							}
 							break;
@@ -404,8 +494,13 @@ public class Sistema {
 							testInvalidAddress(ir.r2);
 							testInvalidAddress(ir.p);
 							if (reg[ir.r2] == 0) {
-								pc = m[ir.p].p;
+								frameDoProcesso = ((int) m[ir.p].p / vm.gm.tamFrame); // 10 / 8 = 1 * tamFrame
+								instrucaoDoProcesso = (m[ir.p].p % vm.gm.tamFrame);
+								posicaoNaMemoria = frames[frameDoProcesso] * vm.gm.tamFrame + instrucaoDoProcesso;
+								pc = posicaoNaMemoria;
+								rodado++;
 							} else {
+								rodado++;
 								pc++;
 							}
 							break;
@@ -414,8 +509,13 @@ public class Sistema {
 							testInvalidAddress(ir.r1);
 							testInvalidAddress(ir.r2);
 							if (reg[ir.r1] > reg[ir.r2]) {
-								pc = ir.p;
+								frameDoProcesso = ((int) ir.p / vm.gm.tamFrame); // 10 / 8 = 1 * tamFrame
+								instrucaoDoProcesso = (ir.p % vm.gm.tamFrame);
+								posicaoNaMemoria = frames[frameDoProcesso] * vm.gm.tamFrame + instrucaoDoProcesso;
+								pc = posicaoNaMemoria;
+								rodado++;
 							} else {
+								rodado++;
 								pc++;
 							}
 							break;
@@ -440,15 +540,24 @@ public class Sistema {
 
 								int posicao = reg[9];
 
-								m[posicao].opc = Opcode.DATA;
-								m[posicao].p = c;
+								// int posicaoNaMemoria = ((int)posicao / 8) * vm.gm.tamFrame + (posicao % 8);
+								frameDoProcesso = ((int) posicao / vm.gm.tamFrame); // 10 / 8 = 1 * tamFrame
+								instrucaoDoProcesso = (posicao % vm.gm.tamFrame); // 10 % 8 = 2
+								posicaoNaMemoria = frames[frameDoProcesso] * vm.gm.tamFrame + instrucaoDoProcesso;
+								m[posicaoNaMemoria].opc = Opcode.DATA;
+								m[posicaoNaMemoria].p = c;
 
-								// in.close();
 							} else if (reg[8] == 2) {
 								int posicao = reg[9];
-								System.out.println("OUTPUT DATA [posicao = " + posicao + "]: " + m[posicao].p);
+								frameDoProcesso = ((int) posicao / vm.gm.tamFrame); // 10 / 8 = 1 * tamFrame
+								instrucaoDoProcesso = (posicao % vm.gm.tamFrame); // 10 % 8 = 2
+								posicaoNaMemoria = frames[frameDoProcesso] * vm.gm.tamFrame + instrucaoDoProcesso;
+
+								System.out.println(
+										"OUTPUT DATA [posicao = " + posicaoNaMemoria + "]: " + m[posicaoNaMemoria].p);
 							}
 
+							rodado++;
 							pc++;
 							break;
 
@@ -578,7 +687,6 @@ public class Sistema {
 			return tabelaPagina;
 		}
 
-		
 		// Após o GM alocar os frames, devolvendo a tabelaPaginas, deve-se proceder a
 		// carga
 		// cada pagina i do programa deve ser copiada (exatamente como tal) para o frame
@@ -587,7 +695,7 @@ public class Sistema {
 				Word[] instrucoes, Map<Integer, Integer> tabelaPagina) {
 
 			for (int i = instrucoesAlocadas; i < instrucoesAlocadas + tamFrame; i++) {
-				
+
 				int posicaoDoFrameNaMemoria = ultimoFrameAlocado * tamFrame + (i % tamFrame);
 
 				if (i < process.length) {
@@ -597,18 +705,31 @@ public class Sistema {
 					memory[posicaoDoFrameNaMemoria].p = process[i].p;
 
 					listaFrames.put(ultimoFrameAlocado, instrucoes); // A tabela de frame recebe o endereco da memoria
-					
+
 					tabelaPagina.put(i, ultimoFrameAlocado);
 				}
 			}
-			
+
 			return tabelaPagina;
-			
+
 		}
 
 		public void desaloca(Map<Integer, Integer> tabelaPagina) {
-			for (Integer frame : tabelaPagina.values()) {
+			Set<Integer> framesSet = new HashSet<Integer>();
+			for (int i = 0; i < tabelaPagina.values().size(); i++) {
+				framesSet.add((Integer) tabelaPagina.values().toArray()[i]);
+			}
+
+			for (Integer frame : framesSet) {
 				listaFrames.remove(frame);
+				for (int i = 0; i < tamFrame; i++) {
+
+					System.out.println("Frame: " + frame + " i: " + i);
+					vm.m[frame * tamFrame + i].opc = Opcode.___;
+					vm.m[frame * tamFrame + i].r1 = -1;
+					vm.m[frame * tamFrame + i].r2 = -1;
+					vm.m[frame * tamFrame + i].p = -1;
+				}
 			}
 		}
 	}
@@ -643,42 +764,39 @@ public class Sistema {
 				// sem espaço
 				return null;
 			}
-			if(vm.cpu.traceOn){
+			if (vm.cpu.traceOn) {
 				System.out.println("---------------------------------- tabela de paginas do programa");
 				System.out.println(tabelaPaginasPrograma);
 				System.out.println("\n---------------------------------- programa carregado na memoria");
 			}
 
-
 			int primeiroFramePrograma = tabelaPaginasPrograma.get(0); // pega o primeiro frame do programa
 			int endereçoNaMemoria = (primeiroFramePrograma * vm.gm.tamFrame); // calcula o endereço na memoria
 
-			Opcode op = vm.m[endereçoNaMemoria].opc; // pega opcode da primeira instrucao
 			int r1 = vm.m[endereçoNaMemoria].r1; // pega r1 da primeira instrucao
 			int r2 = vm.m[endereçoNaMemoria].r2; // pega r2 da primeira instrucao
 			int p = vm.m[endereçoNaMemoria].p; // pega p da primeira instrucao
 
 			int[] reg = { r1, r2, p };
 
-			PCB pcb = new PCB(id, "ready", reg, 0, tabelaPaginasPrograma); // cria PCB do processo
+			PCB pcb = new PCB(id, "ready", reg, endereçoNaMemoria, tabelaPaginasPrograma); // cria PCB do processo
 
 			Set<Integer> frames = new HashSet<Integer>();
-			for(int i = 0; i < pcb.getTabelaPaginas().values().size(); i++) {
+			for (int i = 0; i < pcb.getTabelaPaginas().values().size(); i++) {
 				frames.add((Integer) pcb.getTabelaPaginas().values().toArray()[i]);
 			}
-			
-			if(vm.cpu.traceOn){
+
+			if (vm.cpu.traceOn) {
 				dump(frames);
 			}
 
 			pcb.setMemory(new Word[frames.size() * vm.gm.tamFrame]); // cria memoria do processo
 
 			Word[] memoriaProcesso = pcb.getMemory(); // pega memoria do processo
-			for(int i = 0; i < tabelaPaginasPrograma.values().size(); i++) {
+			for (int i = 0; i < tabelaPaginasPrograma.values().size(); i++) {
 				memoriaProcesso[i] = vm.m[tabelaPaginasPrograma.get(i) * vm.gm.tamFrame + i];
 			}
 			pcb.setMemory(memoriaProcesso);
-			
 
 			id++; // incrementa id
 			listaProcess.add(pcb); // adiciona PCB na lista de processos
@@ -687,70 +805,70 @@ public class Sistema {
 			return pcb;
 		}
 
-		
-		//executa <id> - executa o processo com id fornecido. se não houver processo, retorna erro.
-		public void executa(int id){
-			int[] index = new int[1];
-			listaProcess.forEach(p -> {
-				if (p.getProcessId() == id) {
-					index[0] = listaReady.indexOf(p);
-				}
-			});
-			
-			PCB pcb = listaProcess.get(index[0]);
-			
-			if (pcb == null) {
-				return;
-			}
-			
-			
-			if(vm.cpu.traceOn){
-				System.out.println("---------------------------------- inicia execucao ");
-			}
-
-			vm.cpu.setContext(0, vm.tamMem - 1, pcb.getTabelaPaginas().get(0)); // seta estado da cpu
-			
-			listaReady.get(index[0]).setProcessState("running"); // seta estado do processo para running
-			listaReady.remove(index[0]); // remove processo da lista de processos prontos
-			listaRunning.add(pcb); // adiciona processo a lista de processos em execucao
-			
-			vm.cpu.run(pcb.getMemory()); // cpu roda programa ate parar
-		}
-
-		public Map<Integer, Integer> desaloca(int id) {
+		// executa <id> - executa o processo com id fornecido. se não houver processo,
+		// retorna erro.
+		public void executa(int id) {
 			int[] index = new int[1];
 			listaProcess.forEach(p -> {
 				if (p.getProcessId() == id) {
 					index[0] = listaProcess.indexOf(p);
 				}
 			});
-	
+
 			PCB pcb = listaProcess.get(index[0]);
-	
+
+			if (pcb == null) {
+				return;
+			}
+
+			if (vm.cpu.traceOn) {
+				System.out.println("---------------------------------- inicia execucao ");
+			}
+
+			vm.cpu.setContext(0, vm.tamMem - 1, pcb.getTabelaPaginas().get(0)); // seta estado da cpu
+
+			listaProcess.get(listaProcess.indexOf(pcb)).setProcessState("running"); // seta estado do processo para
+																					// running
+			listaReady.remove(listaReady.indexOf(pcb)); // remove processo da lista de processos prontos
+			listaRunning.add(pcb); // adiciona processo a lista de processos em execucao
+
+			vm.cpu.run(pcb); // cpu roda programa ate parar
+		}
+
+		public Map<Integer, Integer> desaloca(int id) {
+			int[] index = new int[2];
+			listaProcess.forEach(p -> {
+				if (p.getProcessId() == id) {
+					index[0] = listaProcess.indexOf(p);
+				}
+			});
+
+			PCB pcb = listaProcess.get(index[0]);
+
 			if (pcb == null) {
 				return null;
 			}
-			
+
 			Set<Integer> frames = new HashSet<Integer>();
-			for(int i = 0; i < pcb.getTabelaPaginas().values().size(); i++) {
+			for (int i = 0; i < pcb.getTabelaPaginas().values().size(); i++) {
 				frames.add((Integer) pcb.getTabelaPaginas().values().toArray()[i]);
 			}
-	
-			
-			if(vm.cpu.traceOn){
-				for(Integer frame : frames) {
+
+			if (vm.cpu.traceOn) {
+				for (Integer frame : frames) {
 					System.out.println("frame: " + frame);
 				}
 
 				System.out.println("---------------------------------- memoria do processo após execucao");
 				dump(frames);
 			}
-	
+
 			vm.gm.desaloca(pcb.getTabelaPaginas());
-			listaRunning.get(index[0]).setProcessState("finished"); // seta estado do processo para finished
-			listaRunning.remove(index[0]); // remove processo da lista de processos em execucao
 			listaProcess.remove(index[0]); // remove processo da lista de processos
-	
+			if (listaRunning.contains(pcb)) {
+				listaRunning.remove(listaRunning.indexOf(pcb)); // remove processo da lista de processos em execucao
+			}
+
 			return pcb.getTabelaPaginas();
 		}
 	}
@@ -775,11 +893,11 @@ public class Sistema {
 			this.tabelaPaginas = tabelaPaginas;
 		}
 
-		public Word[] getMemory(){
+		public Word[] getMemory() {
 			return memory;
 		}
 
-		public void setMemory(Word[] memory){
+		public void setMemory(Word[] memory) {
 			this.memory = memory;
 		}
 
@@ -826,7 +944,7 @@ public class Sistema {
 	public class InterruptHandling {
 		public void handle(Interrupts irpt, int pc) { // apenas avisa - todas interrupcoes neste momento finalizam o
 														// programa
-			if(vm.cpu.traceOn){
+			if (vm.cpu.traceOn) {
 				System.out
 						.println("                                               Interrupcao " + irpt + "   pc: " + pc);
 			}
@@ -837,14 +955,13 @@ public class Sistema {
 	// ----------------------
 	public class SysCallHandling {
 		private VM vm;
-		
 
 		public void setVM(VM _vm) {
 			vm = _vm;
 		}
 
 		public void handle() { // apenas avisa - todas interrupcoes neste momento finalizam o programa
-			if(vm.cpu.traceOn){
+			if (vm.cpu.traceOn) {
 				System.out.println("                                               Chamada de Sistema com op  /  par:  "
 						+ vm.cpu.reg[8] + " / " + vm.cpu.reg[9]);
 			}
@@ -860,34 +977,36 @@ public class Sistema {
 		return pcbProcesso.getProcessId();
 	}
 
-	private void executa(int id){
+	private void executa(int id) {
 		vm.gp.executa(id);
 	}
 
-	private void desaloca(int id){
+	private void desaloca(int id) {
 		vm.gp.desaloca(id);
 	}
 
-	//exit - sai do sistema
-	private void exit(){
+	// exit - sai do sistema
+	private void exit() {
 		System.exit(0);
 	}
 
-	// dump <id> - lista o conteúdo do PCB e o conteúdo da partição de memória do processo com id
+	// dump <id> - lista o conteúdo do PCB e o conteúdo da partição de memória do
+	// processo com id
 	public void dump(Collection<Integer> frames) {
-		
-			for (Integer frame : frames) {
-				System.out.println("frame: " + frame);
-				System.out.println("inicio: " + (frame * vm.gm.tamFrame));
-				System.out.println("fim: " + ((frame + 1) * vm.gm.tamFrame - 1));
-				vm.mem.dump((frame * vm.gm.tamFrame), ((frame + 1) * vm.gm.tamFrame));// dump da memoria com resultado
-			}
-		
+
+		for (Integer frame : frames) {
+			System.out.println("frame: " + frame);
+			System.out.println("inicio: " + (frame * vm.gm.tamFrame));
+			System.out.println("fim: " + ((frame + 1) * vm.gm.tamFrame - 1));
+			vm.mem.dump((frame * vm.gm.tamFrame), ((frame + 1) * vm.gm.tamFrame));// dump da memoria com resultado
+		}
+
 	}
 
-	// dumpM <inicio, fim> - lista a memória entre posições início e fim, independente do processo
-	public void dumpM(int inicio, int fim){
-		vm.mem.dump(inicio, fim);
+	// dumpM <inicio, fim> - lista a memória entre posições início e fim,
+	// independente do processo
+	public void dumpM(int inicio, int fim) {
+		vm.mem.dump(inicio, fim + 1);
 	}
 
 	public void traceOn() {
@@ -896,6 +1015,17 @@ public class Sistema {
 
 	public void traceOff() {
 		vm.cpu.traceOn = false;
+	}
+
+	public void dumpProcessos() {
+		System.out.println("------------------------------------");
+		for (PCB pcb : vm.gp.listaProcess) {
+			System.out.println("Processo: " + pcb.getProcessId());
+			System.out.println("Estado: " + pcb.getProcessState());
+			System.out.println("PC: " + pcb.getPc());
+			System.out.println("Tabela de páginas: " + pcb.getTabelaPaginas());
+			System.out.println("------------------------------------");
+		}
 	}
 
 	// -------------------------------------------------------------------------------------------------------
@@ -923,28 +1053,29 @@ public class Sistema {
 	// -------------------------------------------------------------------------------------------------------
 	// ------------------- instancia e testa sistema
 
-	public int menuPrincipal(int opcao){
-			System.out.println("------------------------------------");
-			System.out.println("       Digite o comando: ");
-			System.out.println("       1 - load");
-			System.out.println("       2 - executa");
-			System.out.println("       3 - desaloca");
-			System.out.println("       4 - exit");
-			System.out.println("       5 - dump");
-			System.out.println("       6 - dumpM");
-			System.out.println("       7 - traceOn");
-			System.out.println("       8 - traceOff");
-			System.out.println("------------------------------------");
-			System.out.println("\n");
-			
-			opcao = 0;
-			opcao = scanner.nextInt();
-			
-			return opcao;
+	public int menuPrincipal(int opcao) {
+		System.out.println("------------------------------------");
+		System.out.println("       Digite o comando: ");
+		System.out.println("       1 - load");
+		System.out.println("       2 - executa");
+		System.out.println("       3 - desaloca");
+		System.out.println("       4 - exit");
+		System.out.println("       5 - dump");
+		System.out.println("       6 - dumpM");
+		System.out.println("       7 - traceOn");
+		System.out.println("       8 - traceOff");
+		System.out.println("       9 - dumpProcessos");
+		System.out.println("------------------------------------");
+		System.out.println("\n");
+
+		opcao = 0;
+		opcao = scanner.nextInt();
+
+		return opcao;
 	}
 
-	public void menuPrograma(int opcao, Sistema s){
-		switch(opcao) {
+	public void menuPrograma(int opcao, Sistema s) {
+		switch (opcao) {
 			case 1:
 				System.out.println("------------------------------------");
 				System.out.println("Digite o programa: ");
@@ -960,7 +1091,7 @@ public class Sistema {
 				System.out.println("\n");
 
 				int programa = scanner.nextInt();
-				switch(programa){
+				switch (programa) {
 					case 1:
 						s.load(progs.fibonacci10);
 						break;
@@ -987,7 +1118,7 @@ public class Sistema {
 						break;
 					default:
 						System.out.println("Programa não encontrado");
-						break;	
+						break;
 				}
 				System.out.println("------------------------------------");
 				System.out.println("\n\n");
@@ -1003,7 +1134,7 @@ public class Sistema {
 				break;
 			case 3:
 				System.out.println("Digite o id do programa: ");
-				
+
 				int id2 = scanner.nextInt();
 				s.desaloca(id2);
 
@@ -1018,22 +1149,22 @@ public class Sistema {
 				System.out.println("Digite o id do programa: ");
 
 				int id3 = scanner.nextInt();
-				
+
 				int[] index = new int[1];
 				s.vm.gp.listaProcess.forEach(p -> {
 					if (p.getProcessId() == id3) {
 						index[0] = s.vm.gp.listaProcess.indexOf(p);
 					}
 				});
-		
+
 				PCB pcb = s.vm.gp.listaProcess.get(index[0]);
-		
+
 				if (pcb == null) {
 					System.out.println("Processo não encontrado");
 				}
-				
+
 				Set<Integer> frames = new HashSet<Integer>();
-				for(int i = 0; i < pcb.getTabelaPaginas().values().size(); i++) {
+				for (int i = 0; i < pcb.getTabelaPaginas().values().size(); i++) {
 					frames.add((Integer) pcb.getTabelaPaginas().values().toArray()[i]);
 				}
 
@@ -1060,18 +1191,22 @@ public class Sistema {
 			case 8:
 				s.traceOff();
 				break;
+			case 9:
+				s.dumpProcessos();
+				break;
 			default:
 				System.out.println("Comando não encontrado");
 				break;
-			}
-			// scanner.close();
+		}
+		// scanner.close();
 	}
+
 	public static void main(String args[]) {
 		Sistema s = new Sistema();
 		s.traceOn();
 		int opcao = 42;
 
-		while(opcao != -1){
+		while (opcao != -1) {
 			opcao = s.menuPrincipal(opcao);
 			s.menuPrograma(opcao, s);
 		}
@@ -1270,7 +1405,62 @@ public class Sistema {
 				new Word(Opcode.DATA, -1, -1, -1),
 				new Word(Opcode.DATA, -1, -1, -1),
 				new Word(Opcode.DATA, -1, -1, -1),
-				new Word(Opcode.DATA, -1, -1, -1)
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
+				new Word(Opcode.DATA, -1, -1, -1),
 		};
 
 		public Word[] PB = new Word[] {
