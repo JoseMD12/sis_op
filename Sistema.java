@@ -149,15 +149,19 @@ public class Sistema {
 
 		private boolean testInvalidInstruction(Word w) { // toda instrucao deve ser verificada
 			if ((w.r1 > reg.length || w.r1 < -1) || (w.r2 > reg.length || w.r2 < -1)) {
-
+				System.out.println("Registrador invalido");
 				irpt = Interrupts.intEnderecoInvalido;
 				return false;
 			} else {
+
+				System.out.println("Registrador valido");
 				Opcode[] op = Opcode.values();
 				for (Opcode operation : op) {
 					if (w.opc == Opcode.___) {
+						System.out.println("Opcode invalido");
 						break;
 					} else if (w.opc == operation) {
+						System.out.println("Opcode valido");
 						return true;
 					}
 				}
@@ -187,7 +191,7 @@ public class Sistema {
 				// --------------------------------------------------------------------------------------------------
 				// FETCH
 				if (legal(pc)) { // pc valido
-					ir = m[pc]; // <<<<<<<<<<<< busca posicao da memoria apontada por pc, guarda em ir
+					ir = memory[pc]; // <<<<<<<<<<<< busca posicao da memoria apontada por pc, guarda em ir
 					if (debug && vm.cpu.traceOn) {
 						System.out.print("                               pc: " + pc + "       exec: ");
 						mem.dump(ir);
@@ -199,7 +203,7 @@ public class Sistema {
 						// Instrucoes de Busca e Armazenamento em Memoria
 						case LDI: // Rd ← k
 							testInvalidAddress(ir.r1);
-							testInvalidInstruction(m[ir.p]);
+							// testInvalidInstruction(m[ir.p]);
 							reg[ir.r1] = ir.p;
 							pc++;
 							break;
@@ -209,7 +213,7 @@ public class Sistema {
 								testInvalidAddress(ir.p);
 								testInvalidAddress(ir.r1);
 								testInvalidInstruction(m[ir.p]);
-								reg[ir.r1] = m[ir.p].p;
+								reg[ir.r1] = memory[ir.p].p;
 								pc++;
 							}
 							break;
@@ -228,10 +232,10 @@ public class Sistema {
 							if (legal(ir.p)) {
 								testInvalidAddress(ir.p);
 								testInvalidAddress(ir.r1);
-								testInvalidInstruction(m[ir.r1]);
-								testInvalidInstruction(m[ir.p]);
-								m[ir.p].opc = Opcode.DATA;
-								m[ir.p].p = reg[ir.r1];
+								testInvalidInstruction(memory[ir.r1]);
+								testInvalidInstruction(memory[ir.p]);
+								memory[ir.p].opc = Opcode.DATA;
+								memory[ir.p].p = reg[ir.r1];
 								pc++;
 							}
 							;
@@ -431,17 +435,15 @@ public class Sistema {
 						case TRAP:
 							sysCall.handle(); // <<<<< aqui desvia para rotina de chamada de sistema, no momento so
 							if (reg[8] == 1) {
-								Scanner in = new Scanner(System.in); // temos IO
 								System.out.println("INPUT DATA: ");
-								// int c = in.nextInt();
-								int c = 50;
+								int c = scanner.nextInt();
 
 								int posicao = reg[9];
 
 								m[posicao].opc = Opcode.DATA;
 								m[posicao].p = c;
 
-								in.close();
+								// in.close();
 							} else if (reg[8] == 2) {
 								int posicao = reg[9];
 								System.out.println("OUTPUT DATA [posicao = " + posicao + "]: " + m[posicao].p);
@@ -623,14 +625,12 @@ public class Sistema {
 	public class GP {
 		private static List<PCB> listaRunning;
 		private static List<PCB> listaReady;
-		private static List<PCB> listaBlocked;
 		private static List<PCB> listaProcess;
 		private static int id;
 
 		public GP() {
 			listaRunning = new ArrayList<PCB>();
 			listaReady = new ArrayList<PCB>();
-			listaBlocked = new ArrayList<PCB>();
 			listaProcess = new ArrayList<PCB>();
 			id = 0;
 		}
@@ -677,6 +677,7 @@ public class Sistema {
 			for(int i = 0; i < tabelaPaginasPrograma.values().size(); i++) {
 				memoriaProcesso[i] = vm.m[tabelaPaginasPrograma.get(i) * vm.gm.tamFrame + i];
 			}
+			pcb.setMemory(memoriaProcesso);
 			
 
 			id++; // incrementa id
@@ -836,6 +837,7 @@ public class Sistema {
 	// ----------------------
 	public class SysCallHandling {
 		private VM vm;
+		
 
 		public void setVM(VM _vm) {
 			vm = _vm;
@@ -904,6 +906,7 @@ public class Sistema {
 	public InterruptHandling ih;
 	public SysCallHandling sysCall;
 	public static Programas progs;
+	public static Scanner scanner = new Scanner(System.in);
 
 	public Sistema() { // a VM com tratamento de interrupções
 		ih = new InterruptHandling();
@@ -919,12 +922,8 @@ public class Sistema {
 
 	// -------------------------------------------------------------------------------------------------------
 	// ------------------- instancia e testa sistema
-	public static void main(String args[]) {
-		
-		Sistema s = new Sistema();
-		s.traceOn();
-		int opcao = 42;
-		while(opcao != -1){
+
+	public int menuPrincipal(int opcao){
 			System.out.println("------------------------------------");
 			System.out.println("       Digite o comando: ");
 			System.out.println("       1 - load");
@@ -936,145 +935,148 @@ public class Sistema {
 			System.out.println("       7 - traceOn");
 			System.out.println("       8 - traceOff");
 			System.out.println("------------------------------------");
-			System.out.println("\n\n");
-
-			Scanner scanner = new Scanner(System.in);
+			System.out.println("\n");
+			
+			opcao = 0;
 			opcao = scanner.nextInt();
-
-			switch(opcao) {
-				case 1:
-					System.out.println("------------------------------------");
-					System.out.println("		 Digite o programa: ");
-					System.out.println("       1 - fibonacci10");
-					System.out.println("       2 - progMinimo");
-					System.out.println("       3 - entrada");
-					System.out.println("       4 - saida");
-					System.out.println("       5 - io");
-					System.out.println("       6 - fatorial");
-					System.out.println("       7 - fibonacciTRAP");
-					System.out.println("       8 - fatorialTRAP");
-					System.out.println("------------------------------------");
-					System.out.println("\n\n");
-
-					int programa = scanner.nextInt();
-					switch(programa){
-						case 1:
-							s.load(progs.fibonacci10);
-							break;
-						case 2:
-							s.load(progs.progMinimo);
-							break;
-						case 3:
-							s.load(progs.entrada);
-							break;
-						case 4:
-							s.load(progs.saida);
-							break;
-						case 5:
-							s.load(progs.io);
-							break;
-						case 6:
-							s.load(progs.fatorial);
-							break;
-						case 7:
-							s.load(progs.fibonacciTRAP);
-							break;
-						case 8:
-							s.load(progs.fatorialTRAP);
-							break;
-						default:
-							System.out.println("Programa não encontrado");
-							break;	
-					}
-					System.out.println("------------------------------------");
-					System.out.println("\n\n");
-					break;
-				case 2:
-					System.out.println("Digite o id do programa: ");
-					int id = scanner.nextInt();
-					s.executa(id);
-					System.out.println("------------------------------------");
-					System.out.println("\n\n");
-					break;
-				case 3:
-					System.out.println("Digite o id do programa: ");
-					int id2 = scanner.nextInt();
-					s.desaloca(id2);
-					System.out.println("------------------------------------");
-					System.out.println("\n\n");
-					break;
-				case 4:
-					s.exit();
-					break;
-				case 5:
-					System.out.println("------------------------------------");
-					System.out.println("Digite o id do programa: ");
-					System.out.println("\n\n");
-					int id3 = scanner.nextInt();
-					
-					int[] index = new int[1];
-					s.vm.gp.listaProcess.forEach(p -> {
-						if (p.getProcessId() == id3) {
-							index[0] = s.vm.gp.listaProcess.indexOf(p);
-						}
-					});
 			
-					PCB pcb = s.vm.gp.listaProcess.get(index[0]);
-			
-					if (pcb == null) {
-						System.out.println("Processo não encontrado");
-					}
-					
-					Set<Integer> frames = new HashSet<Integer>();
-					for(int i = 0; i < pcb.getTabelaPaginas().values().size(); i++) {
-						frames.add((Integer) pcb.getTabelaPaginas().values().toArray()[i]);
-					}
+			return opcao;
+	}
 
-					s.dump(frames);
-					System.out.println("------------------------------------");
-					System.out.println("\n\n");
-					break;
-				case 6:
-					System.out.println("------------------------------------");
-					System.out.println("Digite o inicio: ");
-					int inicio = scanner.nextInt();
-					System.out.println("Digite o fim: ");
-					int fim = scanner.nextInt();
-					s.dumpM(inicio, fim);
-					System.out.println("------------------------------------");
-					System.out.println("\n\n");
-					break;
-				case 7:
-					s.traceOn();
-					break;
-				case 8:
-					s.traceOff();
-					break;
-				default:
-					System.out.println("Comando não encontrado");
-					break;
+	public void menuPrograma(int opcao, Sistema s){
+		switch(opcao) {
+			case 1:
+				System.out.println("------------------------------------");
+				System.out.println("Digite o programa: ");
+				System.out.println("       1 - fibonacci10");
+				System.out.println("       2 - progMinimo");
+				System.out.println("       3 - entrada");
+				System.out.println("       4 - saida");
+				System.out.println("       5 - io");
+				System.out.println("       6 - fatorial");
+				System.out.println("       7 - fibonacciTRAP");
+				System.out.println("       8 - fatorialTRAP");
+				System.out.println("------------------------------------");
+				System.out.println("\n");
+
+				int programa = scanner.nextInt();
+				switch(programa){
+					case 1:
+						s.load(progs.fibonacci10);
+						break;
+					case 2:
+						s.load(progs.progMinimo);
+						break;
+					case 3:
+						s.load(progs.entrada);
+						break;
+					case 4:
+						s.load(progs.saida);
+						break;
+					case 5:
+						s.load(progs.io);
+						break;
+					case 6:
+						s.load(progs.fatorial);
+						break;
+					case 7:
+						s.load(progs.fibonacciTRAP);
+						break;
+					case 8:
+						s.load(progs.fatorialTRAP);
+						break;
+					default:
+						System.out.println("Programa não encontrado");
+						break;	
+				}
+				System.out.println("------------------------------------");
+				System.out.println("\n\n");
+				break;
+			case 2:
+				System.out.println("Digite o id do programa: ");
+
+				int id = scanner.nextInt();
+				s.executa(id);
+
+				System.out.println("------------------------------------");
+				System.out.println("\n\n");
+				break;
+			case 3:
+				System.out.println("Digite o id do programa: ");
+				
+				int id2 = scanner.nextInt();
+				s.desaloca(id2);
+
+				System.out.println("------------------------------------");
+				System.out.println("\n\n");
+				break;
+			case 4:
+				s.exit();
+				break;
+			case 5:
+				System.out.println("------------------------------------");
+				System.out.println("Digite o id do programa: ");
+
+				int id3 = scanner.nextInt();
+				
+				int[] index = new int[1];
+				s.vm.gp.listaProcess.forEach(p -> {
+					if (p.getProcessId() == id3) {
+						index[0] = s.vm.gp.listaProcess.indexOf(p);
+					}
+				});
+		
+				PCB pcb = s.vm.gp.listaProcess.get(index[0]);
+		
+				if (pcb == null) {
+					System.out.println("Processo não encontrado");
+				}
+				
+				Set<Integer> frames = new HashSet<Integer>();
+				for(int i = 0; i < pcb.getTabelaPaginas().values().size(); i++) {
+					frames.add((Integer) pcb.getTabelaPaginas().values().toArray()[i]);
+				}
+
+				s.dump(frames);
+				System.out.println("------------------------------------");
+				System.out.println("\n\n");
+				break;
+			case 6:
+				System.out.println("------------------------------------");
+
+				System.out.println("Digite o inicio: ");
+				int inicio = scanner.nextInt();
+
+				System.out.println("Digite o fim: ");
+				int fim = scanner.nextInt();
+
+				s.dumpM(inicio, fim);
+				System.out.println("------------------------------------");
+				System.out.println("\n\n");
+				break;
+			case 7:
+				s.traceOn();
+				break;
+			case 8:
+				s.traceOff();
+				break;
+			default:
+				System.out.println("Comando não encontrado");
+				break;
 			}
+			// scanner.close();
+	}
+	public static void main(String args[]) {
+		Sistema s = new Sistema();
+		s.traceOn();
+		int opcao = 42;
+
+		while(opcao != -1){
+			opcao = s.menuPrincipal(opcao);
+			s.menuPrograma(opcao, s);
 		}
 
-
-		// s.loadAndExec(progs.fibonacci10);
-		// s.loadAndExec(progs.progMinimo);
-		// s.loadAndExec(progs.entrada);
-		// s.loadAndExec(progs.saida);
-		int id = s.load(progs.io);
-		int id2= s.load(progs.fatorial);
-		
-		s.executa(id);
-		s.executa(id2);
-
-		s.desaloca(id);
-		s.desaloca(id2);
-		// s.loadAndExec(progs.fatorialTRAP); // saida
-		// s.loadAndExec(progs.fibonacciTRAP); // entrada
-		// s.loadAndExec(progs.PC); // bubble sort
-		//scanner.close();
-		s.exit();
-
+		scanner.close();
 	}
 
 	// -------------------------------------------------------------------------------------------------------
